@@ -855,7 +855,7 @@ export class WorldRenderer {
     camY: number,
     sx: number,
     sy: number,
-    scannerActive: boolean
+    _scannerActive: boolean
   ): void {
     const gx = Math.floor(mouseWorld.wx);
     const gy = Math.floor(mouseWorld.wy);
@@ -866,31 +866,44 @@ export class WorldRenderer {
     ctx.save();
     ctx.strokeStyle = tool.color;
     ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 3]);
     ctx.beginPath();
-    ctx.arc(px, py, 6 * sx, 0, Math.PI * 2);
+    ctx.arc(px, py, 9 * sx, 0, Math.PI * 2);
     ctx.stroke();
+    ctx.setLineDash([]);
 
-    // Center dot
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(px - 1.5, py - 1.5, 3, 3);
+    // Draw highlight around the exact hovered atomic pixel
+    const cellX = (gx - camX) * sx;
+    const cellY = (gy - camY) * sy;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(cellX, cellY, sx, sy);
 
-    // Only show chemical inspector badge when Scanner / Thermal mode [V] is active!
-    if (scannerActive && world.inBounds(gx, gy)) {
+    if (world.inBounds(gx, gy)) {
       const i = world.idx(gx, gy);
       const el = world.grid[i] as ElementId;
-      if (el !== ElementId.EMPTY) {
-        const def = ELEMENTS[el];
-        const temp = Math.round(world.temp[i]);
-        const badge = `${def.symbol} ${temp}°C`;
-        ctx.font = 'bold 10px "JetBrains Mono", monospace';
-        const w = ctx.measureText(badge).width + 10;
-        const bx = Math.min(ctx.canvas.width - w - 8, Math.max(8, px + 10));
-        const by = Math.max(20, py - 8);
-        ctx.fillStyle = 'rgba(10, 14, 24, 0.85)';
-        ctx.fillRect(bx, by - 12, w, 16);
-        ctx.fillStyle = tool.color;
-        ctx.fillText(badge, bx + 5, by);
-      }
+      const def = ELEMENTS[el];
+      const temp = Math.round(world.temp[i]);
+      const press = world.pressure[i];
+      const flags = world.flags[i];
+
+      let badge = `${def.symbol} (${def.name}) | ${temp}°C`;
+      if (press >= 1) badge += ` | ${Math.round(press)} GPa`;
+      if (flags & FLAG_CRYO_BRITTLE) badge += ' [CRYO-BRITTLE]';
+      if (flags & FLAG_QUANTUM_TUNNEL) badge += ' [|Ψ⟩ TUNNEL]';
+      if (flags & FLAG_GLUON_LOCKED) badge += ' [GLUON-LOCK]';
+
+      ctx.font = 'bold 11px "JetBrains Mono", monospace';
+      const w = ctx.measureText(badge).width + 12;
+      const bx = Math.min(ctx.canvas.width - w - 8, Math.max(8, px + 14));
+      const by = Math.max(24, py - 12);
+
+      ctx.fillStyle = 'rgba(10, 14, 24, 0.88)';
+      ctx.strokeStyle = tool.color;
+      ctx.fillRect(bx, by - 14, w, 20);
+      ctx.strokeRect(bx, by - 14, w, 20);
+      ctx.fillStyle = '#f8f9fa';
+      ctx.fillText(badge, bx + 6, by);
     }
     ctx.restore();
   }

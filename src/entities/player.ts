@@ -82,9 +82,11 @@ export class Player {
         // Immediate liftoff into jetpack flight when pushing Up on Left Thumbstick or pressing Jump!
         this.vy = -3.4 * thrustScale;
         this.grounded = false;
+        sound.playJetpackThrust();
       } else if (this.jetpackFuel > 0) {
         this.vy = Math.max(-3.3 * thrustScale, this.vy - 0.48 * thrustScale);
         this.jetpackFuel = Math.max(0, this.jetpackFuel - 0.48 * thrustScale);
+        sound.playJetpackThrust();
         // Spawn tiny exhaust spark occasionally
         if (Math.random() < 0.45) {
           const ex = Math.floor(this.x);
@@ -96,6 +98,9 @@ export class Player {
       }
     } else {
       this.jetpackFuel = Math.min(this.maxJetpack, this.jetpackFuel + (this.grounded ? 1.8 : 0.65));
+      if (this.grounded && Math.abs(this.vx) > 0.7) {
+        sound.playFootstep(false);
+      }
     }
 
     if (moveDown) {
@@ -282,6 +287,7 @@ export class Player {
 
       case 2: // Thermal Lance (Heat) / Cryo-Jet (Cold)
         this.fireCooldown = 2;
+        sound.playThermalStream(secondary);
         for (let k = 0; k < 2; k++) {
           const spread = (Math.random() - 0.5) * 0.25;
           projectiles.push({
@@ -300,6 +306,7 @@ export class Player {
 
       case 3: // Chroniton Time Manipulator
         this.fireCooldown = 4;
+        sound.playChronitonField(!secondary);
         projectiles.push({
           x: spawnX,
           y: spawnY,
@@ -315,6 +322,7 @@ export class Player {
 
       case 4: // Solvents: Water (H2O) / Heavy Water (D2O)
         this.fireCooldown = 2;
+        sound.playLiquidSpray(false);
         projectiles.push({
           x: spawnX,
           y: spawnY,
@@ -331,6 +339,7 @@ export class Player {
 
       case 5: // Acid (H2SO4) / Alkali (NaOH)
         this.fireCooldown = 2;
+        sound.playLiquidSpray(true);
         projectiles.push({
           x: spawnX,
           y: spawnY,
@@ -347,6 +356,7 @@ export class Player {
 
       case 6: // Reactive Alchemy: Metallic Sodium (Na) / Thermite
         this.fireCooldown = 5;
+        sound.playAlkaliLaunch(secondary);
         projectiles.push({
           x: spawnX,
           y: spawnY,
@@ -364,6 +374,7 @@ export class Player {
       case 7: // Nuclear: Fast Neutrons / Lead Shielding
         this.fireCooldown = secondary ? 3 : 4;
         if (secondary) {
+          sound.playAlkaliLaunch(false);
           projectiles.push({
             x: spawnX,
             y: spawnY,
@@ -394,6 +405,7 @@ export class Player {
 
       case 8: // Weak Force Transmuter (W/Z Boson)
         this.fireCooldown = 5;
+        sound.playSubatomicBeam('weak');
         projectiles.push({
           x: spawnX,
           y: spawnY,
@@ -424,6 +436,7 @@ export class Player {
 
       case 9: // Strong Force Gluon Unbinder / Quantum Tunneling Wave-Function
         this.fireCooldown = 6;
+        sound.playSubatomicBeam(secondary ? 'tunnel' : 'strong');
         if (secondary) {
           // Also grant player temporary quantum phase-walk if firing near self
           if (dist < 56) {

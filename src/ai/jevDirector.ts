@@ -1347,6 +1347,7 @@ export class JevDirector {
     if (u.type === 'guard') {
       u.cooldown = 58;
       if (u.weaponLoadout === 'cryo') {
+        sound.playThermalStream(true);
         projectiles.push({
           x: spawnX,
           y: spawnY,
@@ -1359,6 +1360,7 @@ export class JevDirector {
           fromPlayer: false,
         });
       } else if (u.weaponLoadout === 'acid') {
+        sound.playLiquidSpray(true);
         projectiles.push({
           x: spawnX,
           y: spawnY,
@@ -1372,6 +1374,7 @@ export class JevDirector {
           fromPlayer: false,
         });
       } else {
+        sound.playQuantumBeam(380);
         projectiles.push({
           x: spawnX,
           y: spawnY,
@@ -1387,6 +1390,7 @@ export class JevDirector {
     } else if (u.type === 'drone') {
       if (u.weaponLoadout === 'sodium_bomb') {
         u.cooldown = 75;
+        sound.playAlkaliLaunch(false);
         projectiles.push({
           x: u.x,
           y: u.y + 6,
@@ -1401,6 +1405,7 @@ export class JevDirector {
         });
       } else {
         u.cooldown = 48;
+        sound.playQuantumBeam(460);
         projectiles.push({
           x: spawnX,
           y: spawnY,

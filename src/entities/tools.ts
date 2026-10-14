@@ -207,6 +207,7 @@ export function updateProjectiles(
           } else {
             player.hp = Math.max(0, player.hp - 5.5);
           }
+          sound.playCombatHit(true, false);
           this_handleProjectileImpact(p, gx, gy, world, sound);
           hit = true;
           break;
@@ -249,8 +250,12 @@ function handleDirectEnemyHit(
   gx: number,
   gy: number,
   world: WorldGrid,
-  _sound: SoundEngine
+  sound: SoundEngine
 ): void {
+  const isCritShatter =
+    (p.type === 'kinetic' || p.type === 'implosion') && u.cryoBrittleTimer > 0;
+  sound.playCombatHit(false, isCritShatter);
+
   switch (p.type) {
     case 'kinetic':
     case 'implosion': {
@@ -259,9 +264,6 @@ function handleDirectEnemyHit(
       u.hp -= baseDmg * mult;
       u.vx += Math.sign(p.vx) * (u.type === 'robot' ? 1.4 : 2.8);
       u.vy -= 1.4;
-      if (u.cryoBrittleTimer > 0) {
-        world.addReactionPopup(gx, gy - 10, '❄️ CRYO-SHATTER 3× CRIT!', '#72efdd');
-      }
       break;
     }
     case 'cryo':

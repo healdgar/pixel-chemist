@@ -202,8 +202,12 @@ function updateToolLabels(): void {
   activeRmb.textContent = tool.secondaryLabel;
 }
 
-function selectTool(toolId: number): void {
+function selectTool(toolId: number, playSfx: boolean = true): void {
+  const prev = player.selectedTool;
   player.selectedTool = Math.max(1, Math.min(9, toolId));
+  if (playSfx && prev !== player.selectedTool) {
+    sound.playToolSwitch(player.selectedTool);
+  }
   const tool = TOOLS[player.selectedTool - 1];
   updateToolLabels();
 
@@ -228,7 +232,7 @@ TOOLS.forEach((tool) => {
   btn.addEventListener('click', () => selectTool(tool.id));
   toolDock.appendChild(btn);
 });
-selectTool(1);
+selectTool(1, false);
 
 // 4. Input Handling (Keyboard + Mouse + Gamepad + Minimap Click)
 const keys = new Set<string>();
