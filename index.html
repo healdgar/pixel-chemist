@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PIXEL CHEMIST: SAVING BIBBI — Sub-Atomic Alchemical Adventure</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&family=Space+Grotesk:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="app">
+      <!-- Main Fat-Pixel Simulation Canvas -->
+      <canvas id="game-canvas"></canvas>
+
+      <!-- Top HUD Overlay -->
+      <header class="hud-top">
+        <div class="hud-vitals-card">
+          <div class="brand-row">
+            <span class="badge-atomic">⚛ FAT-PIXEL ALCHEMY</span>
+            <span id="gamepad-pill" class="gamepad-pill" title="Plug in or press any button on an Xbox/PlayStation/USB controller">🎮 NO PAD</span>
+            <span id="fps-counter" class="fps-pill">60 FPS</span>
+          </div>
+          <div class="vital-row">
+            <label>SUIT HP</label>
+            <div class="bar-track"><div id="hp-bar" class="bar-fill hp-fill" style="width: 100%"></div></div>
+            <span id="hp-text">100%</span>
+          </div>
+          <div class="vital-row">
+            <label>THRUSTER</label>
+            <div class="bar-track"><div id="jet-bar" class="bar-fill jet-fill" style="width: 100%"></div></div>
+            <span id="jet-text">100%</span>
+          </div>
+          <div class="vital-row">
+            <label>RAD DOSE</label>
+            <div class="bar-track"><div id="rad-bar" class="bar-fill rad-fill" style="width: 0%"></div></div>
+            <span id="rad-text">0 mSv</span>
+          </div>
+        </div>
+
+        <div class="hud-sector-banner">
+          <div id="sector-title" class="sector-title">SECTOR 0: SURFACE BREACH ATRIUM</div>
+          <div id="sector-subtitle" class="sector-subtitle">
+            Explore UP, DOWN, LEFT &amp; RIGHT — Infiltrate the Deep Core to Rescue Bibbi!
+          </div>
+          <div id="jev-broadcast-bar" class="jev-broadcast-bar" title="Click or press [J] to inspect & train the J.E.V. Neural Decision Engine">
+            <span id="jev-alert-pill" class="jev-alert-pill">J.E.V. STANDBY 18%</span>
+            <span id="jev-broadcast-text" class="jev-broadcast-text">J.E.V. NEURAL ENGINE: 1,500 curriculum episodes trained on 12 game levers.</span>
+          </div>
+          <div class="action-pills">
+            <select id="map-select" class="hud-select" aria-label="Select Level Map" title="Switch Level / Environment">
+              <option value="alpine_outdoor">🏔️ 1. Alpine Outdoors</option>
+              <option value="office_tower">🏢 2. Office Tower</option>
+              <option value="castle_keep">🏰 3. Medieval Castle</option>
+              <option value="space_station">🛰️ 4. Space Station (0.45G)</option>
+              <option value="magma_trench">🌋 5. Magma Trench</option>
+              <option value="underground_lab">⚛️ 6. Underground Lab</option>
+            </select>
+            <button id="btn-maps" class="hud-btn hud-btn-accent" title="Open World Map Atlas [Key L]">
+              🗺️ Maps [L]
+            </button>
+            <button id="btn-jev" class="hud-btn hud-btn-jev" title="Open J.E.V. Neural AI Decision Engine & Training Console [Key J]">
+              🧠 J.E.V. AI [J]
+            </button>
+            <button id="btn-rewind" class="hud-btn" title="Rewind simulation 5 seconds [Key R / Controller Y]">
+              ⏪ Rewind [R / Y]
+            </button>
+            <button id="btn-qdash" class="hud-btn" title="Activate Quantum Phase Walk through walls [Key Q / Controller B]">
+              🌀 Phase [Q / B]
+            </button>
+            <button id="btn-thermal" class="hud-btn" title="Toggle Thermal & Pressure Vision [Key V / D-Pad Up]">
+              🌡️ Thermal [V]
+            </button>
+            <button id="btn-codex" class="hud-btn" title="Open Alchemical Reaction Codex [Key C / Start]">
+              📖 Codex [C]
+            </button>
+            <button id="btn-mute" class="hud-btn" title="Toggle Sound [M]">🔊 SFX</button>
+            <button id="btn-reset" class="hud-btn" title="Regenerate Current Map">🔄 Reset</button>
+          </div>
+        </div>
+
+        <div class="hud-minimap-card">
+          <div class="minimap-header">
+            <span id="minimap-title">2D WORLD RADAR</span>
+            <span id="bibbi-status-pill" class="bibbi-pill">BIBBI: IN STASIS</span>
+          </div>
+          <canvas id="minimap-canvas" width="168" height="108"></canvas>
+          <div class="minimap-legend">
+            <span><i class="dot dot-player"></i>You</span>
+            <span><i class="dot dot-enemy"></i>J.E.V.</span>
+            <span><i class="dot dot-term"></i>Logs</span>
+            <span><i class="dot dot-bibbi"></i>Bibbi</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Live Pixel Telemetry & Active Tool Banner (Bottom-Left above dock) -->
+      <div class="hud-bottom-wrap">
+        <div class="active-tool-banner">
+          <div class="tool-mode-info">
+            <span id="active-tool-title" class="tool-title">[1] Graviton Pressure Cannon</span>
+            <span id="active-tool-desc" class="tool-desc">
+              Applies mechanical force &amp; pressure. Overcharging above 5,000 GPa triggers Thermonuclear Fusion!
+            </span>
+          </div>
+          <div class="mouse-bindings">
+            <span id="active-lmb" class="bind-pill lmb-pill">LMB: Kinetic Shockwave</span>
+            <span id="active-rmb" class="bind-pill rmb-pill">RMB: Hyper-Implosion (Fusion!)</span>
+          </div>
+        </div>
+
+        <!-- 9-Slot Alchemical Toolbelt -->
+        <nav id="tool-dock" class="tool-dock" aria-label="Alchemical Toolbelt"></nav>
+      </div>
+
+      <!-- DIALOG 0: World Map / Environment Selector -->
+      <dialog id="map-dialog" closedby="any" aria-labelledby="map-modal-title">
+        <div class="modal-inner">
+          <div class="modal-header">
+            <h2 id="map-modal-title">🗺️ SELECT OPERATION SECTOR / WORLD MAP</h2>
+            <button type="button" class="modal-close" data-close-dialog="map-dialog">✕ ESC</button>
+          </div>
+          <div class="modal-body">
+            <p class="modal-intro">
+              Pursue Director Kael’s syndicate across <strong>6 destructible atomic-pixel environments</strong> to rescue Bibbi! Every building, tree, glacier, castle wall, and space station hull has real chemical &amp; physical properties.
+            </p>
+            <div id="map-cards-grid" class="codex-grid"></div>
+          </div>
+        </div>
+      </dialog>
+
+      <!-- DIALOG 0B: J.E.V. Neural Decision Engine & Live Lever Training Console -->
+      <dialog id="jev-dialog" closedby="any" aria-labelledby="jev-modal-title">
+        <div class="modal-inner">
+          <div class="modal-header">
+            <h2 id="jev-modal-title">🧠 J.E.V. SYSTEM-ONE NEURAL DECISION ENGINE (LIVE LEVERS &amp; RL)</h2>
+            <button type="button" class="modal-close" data-close-dialog="jev-dialog">✕ ESC</button>
+          </div>
+          <div class="modal-body">
+            <p class="modal-intro">
+              <strong>J.E.V. (Joint Experimental Vigilance)</strong> is an in-engine 2-layer Neural Network + Online Policy Gradient (REINFORCE) decision model trained directly on the game’s <strong>12 Alchemical, Physical &amp; Tactical Levers</strong>. It outputs calibrated <code>choice</code> distributions and <code>noul</code> probabilities at 60Hz to command Guards, Hunter-Seeker Drones, Heavy Mechs, and Facility Defenses—and adapts live during combat!
+            </p>
+            <div id="jev-stats-row" class="controls-bar" style="margin-top:0;margin-bottom:12px;"></div>
+            <div class="codex-grid">
+              <div class="codex-card">
+                <h3>🎛️ 12 Live Game Levers (Input Vector x ∈ ℝ¹²)</h3>
+                <div id="jev-levers-list" class="jev-telemetry-list"></div>
+              </div>
+              <div class="codex-card">
+                <h3>🎯 J.E.V. Softmax `choice` &amp; `noul` Outputs</h3>
+                <div id="jev-outputs-list" class="jev-telemetry-list"></div>
+              </div>
+            </div>
+            <div class="event-actions" style="margin-top:14px;">
+              <button id="btn-jev-train" type="button" class="hud-btn hud-btn-accent">
+                ⚡ Train +1,000 Curriculum Episodes
+              </button>
+              <button id="btn-jev-spawn" type="button" class="hud-btn hud-btn-jev">
+                🛸 Warp J.E.V. Interceptor Drone Near Player
+              </button>
+              <button id="btn-jev-reset-weights" type="button" class="hud-btn">
+                🔄 Reset Neural Weights (Xavier Init)
+              </button>
+            </div>
+          </div>
+        </div>
+      </dialog>
+
+      <!-- DIALOG 1: Alchemical Codex & Controls Reference (Modern <dialog closedby="any">) -->
+      <dialog id="codex-dialog" closedby="any" aria-labelledby="codex-title">
+        <div class="modal-inner">
+          <div class="modal-header">
+            <h2 id="codex-title">⚛ SUB-ATOMIC ALCHEMY CODEX &amp; FIELD MANUAL</h2>
+            <button type="button" class="modal-close" data-close-dialog="codex-dialog">✕ ESC</button>
+          </div>
+          <div class="modal-body">
+            <p class="modal-intro">
+              Every fat pixel has a real chemical formula, temperature (°C), mechanical pressure (GPa), radioactivity (Sieverts), and quantum state. Mix physics and chemistry to forge your own path <strong>Up, Down, Left, and Right</strong> to save your daughter <strong>Bibbi</strong>!
+            </p>
+            <div class="codex-grid">
+              <div class="codex-card">
+                <h3>❄️ Cryo-Embrittlement + Pressure</h3>
+                <p>
+                  Reinforced Steel (<code>Fe-C</code>) resists normal blasts. Spray it with <strong>Liquid Nitrogen [Tool 2 RMB]</strong> until it drops below <code>-110°C</code> and frosts cyan, then fire a <strong>Kinetic Pressure Pulse [Tool 1 LMB]</strong> to shatter the entire bulkhead!
+                </p>
+              </div>
+              <div class="codex-card">
+                <h3>☢️ Enormous Pressure → Nuclear Fusion!</h3>
+                <p>
+                  Fire <strong>Hyper-Implosion Orbs [Tool 1 RMB]</strong> repeatedly into confined matter, Water (<code>H₂O</code>), or Deuterium (<code>D₂O</code>). Exceeding <code>5,000 GPa</code> breaches the Coulomb barrier and ignites <strong>Thermonuclear Fusion (17.6 MeV)</strong>!
+                </p>
+              </div>
+              <div class="codex-card">
+                <h3>🧪 Acid Dissolution &amp; Neutralization</h3>
+                <p>
+                  <strong>Sulfuric Acid [Tool 5 LMB]</strong> dissolves Concrete and Stone rapidly. Blocked by a lethal acid pool? Spray <strong>Caustic Alkali (NaOH) [Tool 5 RMB]</strong> to neutralize it into harmless Salt Water (<code>NaCl + H₂O</code>)!
+                </p>
+              </div>
+              <div class="codex-card">
+                <h3>💥 Metallic Sodium + Water</h3>
+                <p>
+                  Lob <strong>Metallic Sodium (Na) [Tool 6 LMB]</strong> into any Water or Acid pool (or spray Water on Sodium) to trigger a violent exothermic alkali explosion (<code>2Na + 2H₂O → 2NaOH + H₂ + ΔH</code>)!
+                </p>
+              </div>
+              <div class="codex-card">
+                <h3>🔥 Aluminothermic Thermite</h3>
+                <p>
+                  Pack <strong>Thermite Powder [Tool 6 RMB]</strong> onto thick Steel floors and ignite it with the <strong>Plasma Heat Ray [Tool 2 LMB]</strong> (<code>&gt;650°C</code>). It burns at <code>2850°C</code>, dripping white-hot Molten Steel straight through armor!
+                </p>
+              </div>
+              <div class="codex-card">
+                <h3>⏩ Temporal Oxidation (Time + Rust)</h3>
+                <p>
+                  Wet any Steel wall with <strong>Water [Tool 4 LMB]</strong> and hit it with the <strong>Chroniton Time Accelerator [Tool 3 LMB]</strong>. Time speeds up 3,000%, rusting solid steel into crumbling <code>Fe₂O₃</code> powder in seconds!
+                </p>
+              </div>
+              <div class="codex-card">
+                <h3>⚡ Weak Force β-Decay Transmutation</h3>
+                <p>
+                  Tungsten-Carbide vaults (<code>W-C</code>) resist heat and acid. Hit them with the <strong>Weak Force Boson Beam [Tool 8]</strong> to transmute Tungsten directly into reactive <strong>Sodium</strong>, or transmute lethal <strong>Uranium-235</strong> into safe <strong>Lead (Pb)</strong>!
+                </p>
+              </div>
+              <div class="codex-card">
+                <h3>🌀 Strong Force &amp; Quantum Tunneling</h3>
+                <p>
+                  Use <strong>Strong Force Unbinder [Tool 9 LMB]</strong> to dissolve atomic nuclei into Quark-Gluon Plasma, or fire <strong>Quantum Tunneling [Tool 9 RMB / Key Q]</strong> to put walls into superposition (<code>|Ψ⟩</code>) and walk right through solid matter!
+                </p>
+              </div>
+            </div>
+            <div class="controls-bar">
+              <span><strong>Left Stick / WASD:</strong> Move &amp; Jetpack Up / Dive Down</span>
+              <span><strong>Right Stick / Mouse:</strong> Aim Reticle (R3 Snaps)</span>
+              <span><strong>LB / RB / 1–9:</strong> Flip Weapons</span>
+              <span><strong>LT / RT / Clicks:</strong> Left &amp; Right Alchemy</span>
+              <span><strong>L:</strong> Map Select</span>
+              <span><strong>B / Q:</strong> Phase Walk</span>
+              <span><strong>X / E:</strong> Terminal</span>
+              <span><strong>Y / R:</strong> Rewind 5s</span>
+            </div>
+          </div>
+        </div>
+      </dialog>
+
+      <!-- DIALOG 2: Lab Terminal Log Viewer -->
+      <dialog id="terminal-dialog" closedby="any" aria-labelledby="term-modal-title">
+        <div class="modal-inner modal-terminal">
+          <div class="modal-header">
+            <h2 id="term-modal-title">💻 FIELD TERMINAL</h2>
+            <button type="button" class="modal-close" data-close-dialog="terminal-dialog">✕ ESC</button>
+          </div>
+          <div class="modal-body">
+            <div id="term-modal-sector" class="term-sector-tag">SECTOR</div>
+            <p id="term-modal-log" class="term-log-body"></p>
+            <div class="term-tip-box">
+              <strong>💡 ALCHEMICAL STRATEGY:</strong>
+              <p id="term-modal-tip"></p>
+            </div>
+          </div>
+        </div>
+      </dialog>
+
+      <!-- DIALOG 3: Thermonuclear Fusion / Catastrophe / Rescue Alert -->
+      <dialog id="event-dialog" closedby="any" aria-labelledby="event-modal-title">
+        <div class="modal-inner modal-event">
+          <div class="modal-header">
+            <h2 id="event-modal-title">☢️ THERMONUCLEAR FUSION ACHIEVED!</h2>
+            <button type="button" class="modal-close" data-close-dialog="event-dialog">✕</button>
+          </div>
+          <div class="modal-body">
+            <p id="event-modal-text" class="event-body-text"></p>
+            <div class="event-actions">
+              <button id="btn-event-next-map" type="button" class="hud-btn hud-btn-accent">
+                🚀 Next World Map [N]
+              </button>
+              <button id="btn-event-rewind" type="button" class="hud-btn hud-btn-accent">
+                ⏪ Rewind Time 5s [R / Y]
+              </button>
+              <button id="btn-event-continue" type="button" class="hud-btn" data-close-dialog="event-dialog">
+                🕶️ Keep Playing Here
+              </button>
+              <button id="btn-event-reset" type="button" class="hud-btn">
+                🔄 Restart Map
+              </button>
+            </div>
+          </div>
+        </div>
+      </dialog>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
