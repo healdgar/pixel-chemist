@@ -99,6 +99,7 @@ function rewindTime(): void {
   player.x = snap.playerX;
   player.y = snap.playerY;
   player.hp = Math.max(60, snap.playerHp);
+  player.oxygen = Math.max(40, player.oxygen);
   player.vx = 0;
   player.vy = 0;
   projectiles.length = 0;
@@ -122,6 +123,7 @@ function loadMap(mapId: MapId): void {
   player.vx = 0;
   player.vy = 0;
   player.hp = 100;
+  player.oxygen = 100;
   player.radiationDose = 0;
   player.gravityScale = level.mapInfo.gravityScale;
 
@@ -595,6 +597,8 @@ const hpBar = document.getElementById('hp-bar')!;
 const hpText = document.getElementById('hp-text')!;
 const jetBar = document.getElementById('jet-bar')!;
 const jetText = document.getElementById('jet-text')!;
+const o2Bar = document.getElementById('o2-bar')!;
+const o2Text = document.getElementById('o2-text')!;
 const radBar = document.getElementById('rad-bar')!;
 const radText = document.getElementById('rad-text')!;
 const sectorTitle = document.getElementById('sector-title')!;
@@ -689,6 +693,10 @@ function updateHud(): void {
   const jetPct = Math.max(0, Math.min(100, Math.round(player.jetpackFuel)));
   jetBar.style.width = `${jetPct}%`;
   jetText.textContent = `${jetPct}`;
+
+  const o2Pct = Math.max(0, Math.min(100, Math.round(player.oxygen)));
+  o2Bar.style.width = `${o2Pct}%`;
+  o2Text.textContent = `${o2Pct}`;
 
   const radPct = Math.max(0, Math.min(100, Math.round(player.radiationDose)));
   radBar.style.width = `${radPct}%`;

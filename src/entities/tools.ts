@@ -1,4 +1,4 @@
-import { ElementId } from '../chemistry/elements';
+import { ElementId, ELEMENTS } from '../chemistry/elements';
 import { WorldGrid } from '../simulation/world';
 import { SoundEngine } from '../audio/soundEngine';
 import type { Player } from './player';
@@ -215,18 +215,51 @@ export function updateProjectiles(
       }
 
       const el = world.getElement(gx, gy);
+      const state = ELEMENTS[el].state;
 
-      // Quantum tunneling projectiles pass through air and apply superposition to solids
+      // Quantum tunneling projectiles pass through air/gas/liquids and apply superposition to solids/powders
       if (p.type === 'quantum_tunnel') {
-        if (el !== ElementId.EMPTY) {
+        if (state === 'solid' || state === 'powder') {
           world.applyQuantumTunneling(gx, gy, p.radius, sound);
+          hit = true;
+          break;
+        }
+        if (state === 'liquid') {
+          p.vx *= 0.985;
+          p.vy *= 0.985;
+        }
+        continue;
+      }
+
+      // Projectiles travel through liquids with hydrodynamic drag instead of stopping at the barrel!
+      if (state === 'liquid') {
+        p.vx *= 0.978;
+        p.vy *= 0.978;
+
+        // Thermal beams gently heat or chill liquid along their trajectory
+        if (p.type === 'heat' || p.type === 'cryo') {
+          const idx = world.idx(gx, gy);
+          world.temp[idx] += p.type === 'heat' ? 35 : -35;
+        }
+
+        const speed = Math.hypot(p.vx, p.vy);
+        // Sodium pellets detonate after traveling a short distance into water (avoids point-blank self-detonation)
+        const sodiumWaterReaction =
+          p.type === 'chemical' &&
+          p.element === ElementId.SODIUM &&
+          (el === ElementId.WATER || el === ElementId.HEAVY_WATER || el === ElementId.SALT_WATER) &&
+          p.ttl < 78;
+
+        if (speed < 1.35 || p.ttl <= 2 || sodiumWaterReaction) {
+          this_handleProjectileImpact(p, gx, gy, world, sound);
           hit = true;
           break;
         }
         continue;
       }
 
-      if (el !== ElementId.EMPTY && el !== ElementId.STEAM && el !== ElementId.SMOKE) {
+      // Solids and powders stop projectiles and trigger full alchemical impact
+      if (state === 'solid' || state === 'powder') {
         this_handleProjectileImpact(p, gx, gy, world, sound);
         hit = true;
         break;
@@ -349,8 +382,12 @@ function this_handleProjectileImpact(
             if (dx * dx + dy * dy <= r * r) {
               const tx = gx + dx;
               const ty = gy + dy;
-              if (world.inBounds(tx, ty) && world.getElement(tx, ty) === ElementId.EMPTY) {
-                world.setElement(tx, ty, p.element);
+              if (world.inBounds(tx, ty)) {
+                const cur = world.getElement(tx, ty);
+                const curState = ELEMENTS[cur].state;
+                if (cur === ElementId.EMPTY || curState === 'gas' || (curState === 'liquid' && cur !== p.element)) {
+                  world.setElement(tx, ty, p.element);
+                }
               }
             }
           }

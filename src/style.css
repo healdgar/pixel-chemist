@@ -118,6 +118,10 @@ body {
   background: linear-gradient(90deg, #4361ee, #4cc9f0);
 }
 
+.o2-fill {
+  background: linear-gradient(90deg, #ff9f1c, #00f5d4, #72efdd);
+}
+
 .rad-fill {
   background: linear-gradient(90deg, #70e000, #ffbe0b, #ff006e);
 }

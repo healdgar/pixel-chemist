@@ -16,6 +16,9 @@ export class Player {
   public maxHp: number = 100;
   public jetpackFuel: number = 100;
   public maxJetpack: number = 100;
+  public oxygen: number = 100;
+  public maxOxygen: number = 100;
+  public submerged: boolean = false;
   public radiationDose: number = 0; // 0..100
   public bodyTemp: number = 37; // Celsius
 
@@ -218,6 +221,52 @@ export class Player {
       }
     }
 
+    // Check if helmet area (around cy - 4) is submerged in liquid or suffocating gas, or in Space Station / Vacuum!
+    let helmetWetOrGasCount = 0;
+    let helmetSamples = 0;
+    for (let dy = -6; dy <= -2; dy += 2) {
+      for (let dx = -2; dx <= 2; dx += 2) {
+        const px = cx + dx;
+        const py = cy + dy;
+        if (!world.inBounds(px, py)) continue;
+        helmetSamples++;
+        const el = world.getElement(px, py);
+        const st = ELEMENTS[el].state;
+        if (st === 'liquid' || st === 'gas') {
+          helmetWetOrGasCount++;
+        }
+      }
+    }
+    this.submerged = helmetSamples > 0 && helmetWetOrGasCount >= Math.ceil(helmetSamples * 0.5);
+
+    // Check if on Orbital Space Station (0.45G) or standing in hard space vacuum (bgGrid === 14)
+    const centerIdx = world.inBounds(cx, cy) ? world.idx(cx, cy) : 0;
+    const inSpaceVacuum = world.inBounds(cx, cy) && world.bgGrid[centerIdx] === 14;
+    const onSpaceStation = this.gravityScale < 0.8;
+
+    // Level Oxygen (O2) Reserve Depletion:
+    // - Enough O2 (~140 seconds) for a full run through the Space Station
+    // - Depletes faster when submerged underwater or out in hard vacuum
+    // - Does NOT auto-regenerate in normal air (finite level supply), except in oxygenated Bio-Gel vats!
+    if (inBioGel) {
+      this.oxygen = Math.min(this.maxOxygen, this.oxygen + 0.14);
+    } else if (this.submerged || inSpaceVacuum) {
+      this.oxygen = Math.max(0, this.oxygen - 0.018);
+      if (this.submerged) {
+        // Gentle fluid drag on player movement when submerged
+        this.vx *= 0.92;
+        this.vy *= 0.94;
+      }
+    } else if (onSpaceStation) {
+      this.oxygen = Math.max(0, this.oxygen - 0.011);
+    }
+
+    // Suffocation damage if Level O2 Tank hits 0 while submerged or in space!
+    if (this.oxygen <= 0 && (this.submerged || onSpaceStation || inSpaceVacuum)) {
+      this.hp = Math.max(0, this.hp - 0.22);
+      sound.playGeigerClick();
+    }
+
     this.bodyTemp += ((maxTemp > 60 ? maxTemp : minTemp < 0 ? minTemp : 37) - this.bodyTemp) * 0.05;
 
     if (inFusion) {
@@ -242,7 +291,7 @@ export class Player {
     if (inBioGel) {
       this.hp = Math.min(this.maxHp, this.hp + 0.6);
       this.radiationDose = Math.max(0, this.radiationDose - 0.8);
-    } else if (!inAcid && maxTemp <= 150 && radSum <= 1.0 && this.hp > 0) {
+    } else if (!inAcid && maxTemp <= 150 && radSum <= 1.0 && this.hp > 0 && (this.oxygen > 0 || (!this.submerged && !onSpaceStation))) {
       // Slow suit self-repair nano-gel
       this.hp = Math.min(this.maxHp, this.hp + 0.03);
     }

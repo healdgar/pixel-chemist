@@ -23,7 +23,7 @@
 
       <!-- Minimal Top HUD: Left Vitals Pill + Right Radar & Menu Button -->
       <header class="hud-top">
-        <div class="hud-vitals-pill" title="Suit Integrity (HP), Jetpack Fuel, and Radiation Dose">
+        <div class="hud-vitals-pill" title="Suit Integrity (HP), Jetpack Fuel, Level Oxygen Reserve (O2), and Radiation Dose">
           <div class="vital-mini">
             <span class="vital-lbl">HP</span>
             <div class="bar-track"><div id="hp-bar" class="bar-fill hp-fill" style="width: 100%"></div></div>
@@ -33,6 +33,11 @@
             <span class="vital-lbl">JET</span>
             <div class="bar-track"><div id="jet-bar" class="bar-fill jet-fill" style="width: 100%"></div></div>
             <span id="jet-text" class="vital-val">100</span>
+          </div>
+          <div class="vital-mini">
+            <span class="vital-lbl">O2</span>
+            <div class="bar-track"><div id="o2-bar" class="bar-fill o2-fill" style="width: 100%"></div></div>
+            <span id="o2-text" class="vital-val">100</span>
           </div>
           <div class="vital-mini">
             <span class="vital-lbl">RAD</span>
