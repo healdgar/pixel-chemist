@@ -21,139 +21,66 @@
       <!-- Main Fat-Pixel Simulation Canvas -->
       <canvas id="game-canvas"></canvas>
 
-      <!-- Top HUD Overlay -->
+      <!-- Minimal Top HUD: Left Vitals Pill + Right Radar & Menu Button -->
       <header class="hud-top">
-        <div class="hud-vitals-card">
-          <div class="brand-row">
-            <span class="badge-atomic">⚛ FAT-PIXEL ALCHEMY</span>
-            <span id="gamepad-pill" class="gamepad-pill" title="Plug in or press any button on an Xbox/PlayStation/USB controller">🎮 NO PAD</span>
-            <span id="fps-counter" class="fps-pill">60 FPS</span>
-          </div>
-          <div class="vital-row">
-            <label>SUIT HP</label>
+        <div class="hud-vitals-pill" title="Suit Integrity (HP), Jetpack Fuel, and Radiation Dose">
+          <div class="vital-mini">
+            <span class="vital-lbl">HP</span>
             <div class="bar-track"><div id="hp-bar" class="bar-fill hp-fill" style="width: 100%"></div></div>
-            <span id="hp-text">100%</span>
+            <span id="hp-text" class="vital-val">100</span>
           </div>
-          <div class="vital-row">
-            <label>THRUSTER</label>
+          <div class="vital-mini">
+            <span class="vital-lbl">JET</span>
             <div class="bar-track"><div id="jet-bar" class="bar-fill jet-fill" style="width: 100%"></div></div>
-            <span id="jet-text">100%</span>
+            <span id="jet-text" class="vital-val">100</span>
           </div>
-          <div class="vital-row">
-            <label>RAD DOSE</label>
+          <div class="vital-mini">
+            <span class="vital-lbl">RAD</span>
             <div class="bar-track"><div id="rad-bar" class="bar-fill rad-fill" style="width: 0%"></div></div>
-            <span id="rad-text">0 mSv</span>
+            <span id="rad-text" class="vital-val">0</span>
           </div>
         </div>
 
-        <div class="hud-sector-banner">
-          <div id="sector-title" class="sector-title">SECTOR 0: SURFACE BREACH ATRIUM</div>
-          <div id="sector-subtitle" class="sector-subtitle">
-            Explore UP, DOWN, LEFT &amp; RIGHT — Infiltrate the Deep Core to Rescue Bibbi!
-          </div>
-          <div id="jev-broadcast-bar" class="jev-broadcast-bar" title="Click or press [J] to inspect & train the J.E.V. Neural Decision Engine">
-            <span id="jev-alert-pill" class="jev-alert-pill">J.E.V. STANDBY 18%</span>
-            <span id="jev-broadcast-text" class="jev-broadcast-text">J.E.V. NEURAL ENGINE: 1,500 curriculum episodes trained on 12 game levers.</span>
-          </div>
-          <div class="action-pills">
-            <select id="map-select" class="hud-select" aria-label="Select Level Map" title="Switch Level / Environment">
-              <option value="alpine_outdoor">🏔️ 1. Alpine Outdoors</option>
-              <option value="office_tower">🏢 2. Office Tower</option>
-              <option value="castle_keep">🏰 3. Medieval Castle</option>
-              <option value="space_station">🛰️ 4. Space Station (0.45G)</option>
-              <option value="magma_trench">🌋 5. Magma Trench</option>
-              <option value="underground_lab">⚛️ 6. Underground Lab</option>
-            </select>
-            <button id="btn-maps" class="hud-btn hud-btn-accent" title="Open World Map Atlas [Key L]">
-              🗺️ Maps [L]
+        <div class="hud-top-right">
+          <canvas id="minimap-canvas" width="112" height="72" title="Tap/Click Radar to Quantum Teleport"></canvas>
+          <div class="hud-quick-btns">
+            <button id="btn-menu" type="button" class="hud-icon-btn" title="Open Game Menu, Maps, J.E.V. AI &amp; Codex [ESC / M]">
+              ☰
             </button>
-            <button id="btn-jev" class="hud-btn hud-btn-jev" title="Open J.E.V. Neural AI Decision Engine & Training Console [Key J]">
-              🧠 J.E.V. AI [J]
+            <button id="btn-rewind" type="button" class="hud-icon-btn" title="Rewind Time 5s [R / Y]">
+              ⏪
             </button>
-            <button id="btn-rewind" class="hud-btn" title="Rewind simulation 5 seconds [Key R / Controller Y]">
-              ⏪ Rewind [R / Y]
-            </button>
-            <button id="btn-qdash" class="hud-btn" title="Activate Quantum Phase Walk through walls [Key Q / Controller B]">
-              🌀 Phase [Q / B]
-            </button>
-            <button id="btn-thermal" class="hud-btn" title="Toggle Thermal & Pressure Vision [Key V / D-Pad Up]">
-              🌡️ Thermal [V]
-            </button>
-            <button id="btn-codex" class="hud-btn" title="Open Alchemical Reaction Codex [Key C / Start]">
-              📖 Codex [C]
-            </button>
-            <button id="btn-touch-toggle" class="hud-btn" title="Toggle Mobile Dual-Thumbstick Touch Controls">
-              📱 Touch
-            </button>
-            <button id="btn-fullscreen" class="hud-btn" title="Enter Landscape Fullscreen">
-              ⛶ Fullscreen
-            </button>
-            <button id="btn-mute" class="hud-btn" title="Toggle Sound [M]">🔊 SFX</button>
-            <button id="btn-reset" class="hud-btn" title="Regenerate Current Map">🔄 Reset</button>
-          </div>
-        </div>
-
-        <div class="hud-minimap-card">
-          <div class="minimap-header">
-            <span id="minimap-title">2D WORLD RADAR</span>
-            <span id="bibbi-status-pill" class="bibbi-pill">BIBBI: IN STASIS</span>
-          </div>
-          <canvas id="minimap-canvas" width="168" height="108"></canvas>
-          <div class="minimap-legend">
-            <span><i class="dot dot-player"></i>You</span>
-            <span><i class="dot dot-enemy"></i>J.E.V.</span>
-            <span><i class="dot dot-term"></i>Logs</span>
-            <span><i class="dot dot-bibbi"></i>Bibbi</span>
           </div>
         </div>
       </header>
 
-      <!-- Live Pixel Telemetry & Active Tool Banner (Bottom-Left above dock) -->
+      <!-- Minimal Bottom Tool Strip -->
       <div class="hud-bottom-wrap">
-        <div class="active-tool-banner">
-          <div class="tool-mode-info">
-            <span id="active-tool-title" class="tool-title">[1] Graviton Pressure Cannon</span>
-            <span id="active-tool-desc" class="tool-desc">
-              Applies mechanical force &amp; pressure. Overcharging above 5,000 GPa triggers Thermonuclear Fusion!
-            </span>
-          </div>
-          <div class="mouse-bindings">
-            <span id="active-lmb" class="bind-pill lmb-pill">LMB: Kinetic Shockwave</span>
-            <span id="active-rmb" class="bind-pill rmb-pill">RMB: Hyper-Implosion (Fusion!)</span>
-          </div>
+        <div class="active-tool-micro">
+          <span id="active-tool-title" class="tool-title">[1] Graviton</span>
+          <span id="active-lmb" class="bind-micro lmb-micro">LMB: Shockwave</span>
+          <span id="active-rmb" class="bind-micro rmb-micro">RMB: Implosion</span>
+          <span id="active-tool-desc" style="display:none"></span>
         </div>
-
-        <!-- 9-Slot Alchemical Toolbelt -->
         <nav id="tool-dock" class="tool-dock" aria-label="Alchemical Toolbelt"></nav>
       </div>
 
-      <!-- Mobile Dual-Thumbstick & Action Cluster Overlay -->
+      <!-- Clean Mobile Dual-Thumbstick Overlay (Only 2 Sticks + 2 Essential Action Buttons) -->
       <div id="touch-controls-layer" class="touch-controls-layer" aria-label="Mobile Touch Controls">
-        <!-- Left Thumb Cluster: Move + Jetpack (Up) + Bumper/Phase/Terminal -->
         <div class="touch-cluster touch-cluster-left">
-          <div class="touch-mini-row">
-            <button id="touch-btn-prev" type="button" class="touch-action-btn touch-bumper-btn">◀ LB</button>
-            <button id="touch-btn-phase" type="button" class="touch-action-btn touch-phase-btn">🌀 |Ψ⟩</button>
-            <button id="touch-btn-term" type="button" class="touch-action-btn">💻 LOG</button>
-          </div>
+          <button id="touch-btn-phase" type="button" class="touch-action-btn touch-phase-btn" title="Quantum Phase Walk">|Ψ⟩</button>
           <div id="touch-stick-left" class="touch-stick-zone">
-            <span class="stick-hint stick-hint-top">▲ JET</span>
-            <span class="stick-hint stick-hint-bottom">▼ DIVE</span>
-            <div id="touch-knob-left" class="touch-stick-knob">MOVE</div>
+            <div id="touch-knob-left" class="touch-stick-knob"></div>
           </div>
         </div>
 
-        <!-- Right Thumb Cluster: 360° Reticle Aim + Primary/Secondary Alchemy Fire -->
         <div class="touch-cluster touch-cluster-right">
           <div class="touch-mini-row">
-            <button id="touch-btn-rewind" type="button" class="touch-action-btn">⏪ 5s</button>
-            <button id="touch-btn-secondary" type="button" class="touch-action-btn touch-rmb-btn">⚡ ALT</button>
-            <button id="touch-btn-primary" type="button" class="touch-action-btn touch-lmb-btn">🔥 FIRE</button>
-            <button id="touch-btn-next" type="button" class="touch-action-btn touch-bumper-btn">RB ▶</button>
+            <button id="touch-btn-secondary" type="button" class="touch-action-btn touch-rmb-btn">ALT</button>
+            <button id="touch-btn-primary" type="button" class="touch-action-btn touch-lmb-btn">FIRE</button>
           </div>
           <div id="touch-stick-right" class="touch-stick-zone touch-stick-aim">
-            <span class="stick-hint stick-hint-top">AIM / AUTO-FIRE</span>
-            <div id="touch-knob-right" class="touch-stick-knob">⊕ AIM</div>
+            <div id="touch-knob-right" class="touch-stick-knob"></div>
           </div>
         </div>
       </div>
@@ -163,19 +90,69 @@
         <div class="rotate-card">
           <div class="rotate-icon">📱↻</div>
           <h3>Rotate Phone Horizontally</h3>
-          <p>
-            <strong>Pixel Chemist: Saving Bibbi</strong> is designed for widescreen horizontal hold with dual-thumbstick alchemy controls.
-          </p>
+          <p>Hold your phone horizontally for widescreen view and comfortable thumbstick space.</p>
           <div class="rotate-actions">
             <button id="btn-lock-landscape" type="button" class="hud-btn hud-btn-accent">
-              ⛶ Lock Landscape Fullscreen
+              ⛶ Fullscreen Landscape
             </button>
             <button id="btn-dismiss-portrait" type="button" class="hud-btn">
-              Play in Portrait Anyway
+              Dismiss
             </button>
           </div>
         </div>
       </div>
+
+      <!-- DIALOG MENU: Unified Pause / Sector / Controls Menu (Keeps Playing Screen Clean!) -->
+      <dialog id="menu-dialog" closedby="any" aria-labelledby="menu-modal-title">
+        <div class="modal-inner">
+          <div class="modal-header">
+            <h2 id="menu-modal-title">⚛ FIELD COMMAND MENU</h2>
+            <button type="button" class="modal-close" data-close-dialog="menu-dialog">✕ RESUME</button>
+          </div>
+          <div class="modal-body">
+            <div class="menu-status-strip">
+              <div>
+                <div id="sector-title" class="sector-title">SECTOR 0: SURFACE BREACH</div>
+                <div id="sector-subtitle" class="sector-subtitle">Rescue Bibbi from the Deep Core</div>
+              </div>
+              <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                <span id="bibbi-status-pill" class="bibbi-pill">BIBBI: IN STASIS</span>
+                <span id="gamepad-pill" class="gamepad-pill">🎮 NO PAD</span>
+                <span id="fps-counter" class="fps-pill">60 FPS</span>
+              </div>
+            </div>
+
+            <div id="jev-broadcast-bar" class="jev-broadcast-bar" title="Click to inspect &amp; train the J.E.V. Neural Decision Engine">
+              <span id="jev-alert-pill" class="jev-alert-pill">J.E.V. STANDBY</span>
+              <span id="jev-broadcast-text" class="jev-broadcast-text">J.E.V. Neural Engine active.</span>
+            </div>
+
+            <div class="menu-grid">
+              <label class="menu-field">
+                <span>🗺️ Active Sector / Map</span>
+                <select id="map-select" class="hud-select" aria-label="Select Level Map">
+                  <option value="alpine_outdoor">🏔️ 1. Alpine Outdoors</option>
+                  <option value="office_tower">🏢 2. Office Tower</option>
+                  <option value="castle_keep">🏰 3. Medieval Castle</option>
+                  <option value="space_station">🛰️ 4. Space Station (0.45G)</option>
+                  <option value="magma_trench">🌋 5. Magma Trench</option>
+                  <option value="underground_lab">⚛️ 6. Underground Lab</option>
+                </select>
+              </label>
+              <button id="btn-maps" type="button" class="hud-btn hud-btn-accent">🗺️ World Map Cards [L]</button>
+              <button id="btn-jev" type="button" class="hud-btn hud-btn-jev">🧠 J.E.V. AI Console [J]</button>
+              <button id="btn-codex" type="button" class="hud-btn">📖 Alchemy Codex [C]</button>
+              <button id="btn-thermal" type="button" class="hud-btn">🌡️ Thermal / Scanner [V]</button>
+              <button id="btn-qdash" type="button" class="hud-btn">🌀 Phase Walk [Q]</button>
+              <button id="btn-touch-toggle" type="button" class="hud-btn">📱 Touch Controls</button>
+              <button id="btn-fullscreen" type="button" class="hud-btn">⛶ Fullscreen</button>
+              <button id="btn-mute" type="button" class="hud-btn">🔊 SFX</button>
+              <button id="btn-reset" type="button" class="hud-btn">🔄 Restart Map</button>
+            </div>
+            <span id="minimap-title" style="display:none">RADAR</span>
+          </div>
+        </div>
+      </dialog>
 
       <!-- DIALOG 0: World Map / Environment Selector -->
       <dialog id="map-dialog" closedby="any" aria-labelledby="map-modal-title">

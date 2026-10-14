@@ -1,7 +1,7 @@
 :root {
   --bg-deep: #070a12;
-  --panel-bg: rgba(11, 16, 28, 0.86);
-  --panel-border: rgba(76, 201, 240, 0.32);
+  --panel-bg: rgba(11, 16, 28, 0.72);
+  --panel-border: rgba(76, 201, 240, 0.28);
   --accent-cyan: #00f5d4;
   --accent-blue: #4cc9f0;
   --accent-gold: #ffd166;
@@ -18,6 +18,7 @@
   margin: 0;
   padding: 0;
   user-select: none;
+  -webkit-user-select: none;
 }
 
 html,
@@ -50,86 +51,57 @@ body {
   touch-action: none;
 }
 
-/* Top HUD Overlay */
+/* ============================================================================
+   Minimal Playing HUD (Corners Only — Leaves 92%+ of Screen Unobstructed!)
+   ============================================================================ */
 .hud-top {
   position: absolute;
-  top: 10px;
-  left: 12px;
-  right: 12px;
+  top: max(6px, env(safe-area-inset-top, 6px));
+  left: max(8px, env(safe-area-inset-left, 8px));
+  right: max(8px, env(safe-area-inset-right, 8px));
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 12px;
   pointer-events: none;
   z-index: 10;
 }
 
-.hud-vitals-card,
-.hud-sector-banner,
-.hud-minimap-card {
+/* Top-Left Micro Vitals Pill */
+.hud-vitals-pill {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
-  border-radius: 10px;
-  padding: 10px 14px;
-  backdrop-filter: blur(8px);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+  border-radius: 8px;
+  padding: 5px 8px;
+  width: 132px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  backdrop-filter: blur(4px);
   pointer-events: auto;
 }
 
-.hud-vitals-card {
-  min-width: 245px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.brand-row {
-  display: flex;
-  justify-content: space-between;
+.vital-mini {
+  display: grid;
+  grid-template-columns: 24px 1fr 24px;
   align-items: center;
-  margin-bottom: 2px;
-}
-
-.badge-atomic {
-  font-size: 11px;
-  font-weight: 800;
-  color: var(--accent-cyan);
-  letter-spacing: 0.05em;
-}
-
-.fps-pill,
-.gamepad-pill {
-  font-size: 10px;
-  color: var(--text-muted);
-  background: rgba(255, 255, 255, 0.06);
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-.gamepad-pill.connected {
-  color: #06d6a0;
-  background: rgba(6, 214, 160, 0.16);
-  border: 1px solid rgba(6, 214, 160, 0.45);
+  gap: 5px;
+  font-size: 9.5px;
   font-weight: 700;
 }
 
-.vital-row {
-  display: grid;
-  grid-template-columns: 68px 1fr 42px;
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.vital-row label {
+.vital-lbl {
   color: var(--text-muted);
 }
 
+.vital-val {
+  text-align: right;
+  color: var(--text-main);
+}
+
 .bar-track {
-  height: 8px;
-  background: rgba(255, 255, 255, 0.09);
-  border-radius: 4px;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
   overflow: hidden;
 }
 
@@ -150,55 +122,160 @@ body {
   background: linear-gradient(90deg, #70e000, #ffbe0b, #ff006e);
 }
 
-/* Center Sector Banner */
-.hud-sector-banner {
-  flex: 1;
-  max-width: 650px;
-  text-align: center;
+/* Top-Right Compact Radar + Menu Icon */
+.hud-top-right {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+#minimap-canvas {
+  width: 98px;
+  height: 62px;
+  border: 1px solid rgba(76, 201, 240, 0.35);
+  border-radius: 6px;
+  background: rgba(9, 13, 22, 0.8);
+  image-rendering: pixelated;
+  cursor: pointer;
+}
+
+.hud-quick-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hud-icon-btn {
+  width: 30px;
+  height: 29px;
+  background: var(--panel-bg);
+  color: var(--text-main);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+}
+
+.hud-icon-btn:hover {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+}
+
+/* Minimal Bottom Tool Strip */
+.hud-bottom-wrap {
+  position: absolute;
+  bottom: max(6px, env(safe-area-inset-bottom, 6px));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(92vw, 680px);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
+  gap: 3px;
+  pointer-events: none;
+  z-index: 10;
 }
 
-.sector-title {
-  font-family: var(--font-display);
-  font-size: 15px;
-  font-weight: 700;
+.active-tool-micro {
+  background: rgba(9, 14, 26, 0.72);
+  border: 1px solid rgba(76, 201, 240, 0.22);
+  border-radius: 6px;
+  padding: 2px 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  pointer-events: auto;
+}
+
+.tool-title {
+  font-weight: 800;
   color: var(--accent-gold);
-  letter-spacing: 0.04em;
 }
 
-.sector-subtitle {
-  font-size: 11px;
+.bind-micro {
+  font-size: 9.5px;
   color: var(--text-muted);
 }
 
-.action-pills {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px;
-  margin-top: 4px;
+.lmb-micro {
+  color: var(--accent-cyan);
 }
 
+.rmb-micro {
+  color: #ff99c8;
+}
+
+.tool-dock {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 4px;
+  pointer-events: auto;
+}
+
+.tool-slot {
+  background: rgba(11, 16, 28, 0.76);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 6px;
+  padding: 4px 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  cursor: pointer;
+  color: var(--text-main);
+  font-family: var(--font-mono);
+  transition: transform 0.1s ease, border-color 0.1s ease;
+}
+
+.tool-slot:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.tool-slot.active {
+  background: rgba(24, 38, 68, 0.92);
+  box-shadow: 0 0 10px rgba(76, 201, 240, 0.3);
+  transform: translateY(-2px);
+}
+
+.slot-key {
+  font-size: 9.5px;
+  font-weight: 800;
+}
+
+.slot-name {
+  font-size: 9.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================================================================
+   Menu & Modal Dialogs
+   ============================================================================ */
 .hud-btn {
-  background: rgba(30, 41, 59, 0.85);
+  background: rgba(30, 41, 59, 0.88);
   color: var(--text-main);
   border: 1px solid rgba(148, 163, 184, 0.35);
   border-radius: 6px;
-  padding: 4px 10px;
+  padding: 7px 11px;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s ease;
 }
 
 .hud-btn:hover {
   border-color: var(--accent-cyan);
   background: rgba(15, 118, 110, 0.35);
-  transform: translateY(-1px);
 }
 
 .hud-btn-accent {
@@ -206,108 +283,83 @@ body {
   color: var(--accent-gold);
 }
 
+.hud-btn-jev {
+  border-color: #f72585;
+  color: #ff99c8;
+  background: rgba(89, 13, 34, 0.55);
+}
+
 .hud-select {
-  background: rgba(15, 23, 42, 0.92);
+  background: rgba(15, 23, 42, 0.95);
   color: var(--accent-cyan);
   border: 1px solid var(--accent-cyan);
   border-radius: 6px;
-  padding: 4px 8px;
+  padding: 6px 8px;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 700;
   cursor: pointer;
 }
 
-.map-card {
-  cursor: pointer;
-  transition: all 0.16s ease;
+.menu-status-strip {
   display: flex;
-  flex-direction: column;
   justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(76, 201, 240, 0.22);
+  border-radius: 8px;
+  padding: 8px 12px;
 }
 
-.map-card:hover,
-.map-card.active-map {
-  border-color: var(--accent-cyan);
-  background: rgba(15, 118, 110, 0.25);
-  transform: translateY(-2px);
-}
-
-/* Minimap Card */
-.hud-minimap-card {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  align-items: center;
-}
-
-.minimap-header {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 10px;
+.sector-title {
+  font-family: var(--font-display);
+  font-size: 14px;
   font-weight: 700;
+  color: var(--accent-gold);
+}
+
+.sector-subtitle {
+  font-size: 11px;
   color: var(--text-muted);
 }
 
-.bibbi-pill {
-  color: #ff99c8;
-  background: rgba(247, 37, 133, 0.2);
-  border: 1px solid rgba(247, 37, 133, 0.5);
-  padding: 1px 6px;
+.fps-pill,
+.gamepad-pill {
+  font-size: 10px;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px 6px;
   border-radius: 4px;
 }
 
-#minimap-canvas {
-  border: 1px solid rgba(76, 201, 240, 0.35);
-  border-radius: 6px;
-  background: #090d16;
-  image-rendering: pixelated;
-  cursor: pointer;
+.gamepad-pill.connected {
+  color: #06d6a0;
+  background: rgba(6, 214, 160, 0.16);
+  border: 1px solid rgba(6, 214, 160, 0.45);
+  font-weight: 700;
 }
 
-.minimap-legend {
-  display: flex;
-  gap: 10px;
+.bibbi-pill {
   font-size: 10px;
-  color: var(--text-muted);
+  color: #ff99c8;
+  background: rgba(247, 37, 133, 0.2);
+  border: 1px solid rgba(247, 37, 133, 0.5);
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
-.dot {
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  margin-right: 4px;
-}
-
-.dot-player {
-  background: #ffd166;
-}
-.dot-enemy {
-  background: #ff4d6d;
-}
-.dot-term {
-  background: #00f5d4;
-}
-.dot-bibbi {
-  background: #f72585;
-}
-
-/* J.E.V. Neural Director Broadcast Bar & Telemetry */
 .jev-broadcast-bar {
   width: 100%;
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 8px;
   background: rgba(25, 12, 34, 0.78);
   border: 1px solid rgba(247, 37, 133, 0.42);
   border-radius: 6px;
-  padding: 3px 10px;
-  font-size: 10.5px;
+  padding: 6px 10px;
+  font-size: 11px;
   cursor: pointer;
 }
 
@@ -328,171 +380,64 @@ body {
   white-space: nowrap;
 }
 
-.hud-btn-jev {
-  border-color: #f72585;
-  color: #ff99c8;
-  background: rgba(89, 13, 34, 0.55);
+.menu-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+  gap: 8px;
 }
 
-.hud-btn-jev:hover {
-  border-color: #ff4d6d;
-  background: rgba(247, 37, 133, 0.35);
+.menu-field {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  background: rgba(20, 29, 49, 0.7);
+  border: 1px solid rgba(76, 201, 240, 0.22);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 11.5px;
 }
 
 .jev-telemetry-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
   margin-top: 6px;
 }
 
 .jev-lever-row {
   display: grid;
-  grid-template-columns: 1fr 78px 42px;
+  grid-template-columns: 1fr 74px 40px;
   align-items: center;
   gap: 8px;
   font-size: 10.5px;
 }
 
-/* Bottom Alchemical Tool Dock */
-.hud-bottom-wrap {
-  position: absolute;
-  bottom: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(96vw, 1080px);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  pointer-events: none;
-  z-index: 10;
-}
-
-.active-tool-banner {
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 8px;
-  padding: 7px 14px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  backdrop-filter: blur(8px);
-  pointer-events: auto;
-}
-
-.tool-mode-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.tool-title {
-  font-size: 13px;
-  font-weight: 800;
-  color: var(--accent-gold);
-}
-
-.tool-desc {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.mouse-bindings {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.bind-pill {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 4px 9px;
-  border-radius: 6px;
-}
-
-.lmb-pill {
-  background: rgba(0, 245, 212, 0.14);
-  border: 1px solid rgba(0, 245, 212, 0.45);
-  color: var(--accent-cyan);
-}
-
-.rmb-pill {
-  background: rgba(247, 37, 133, 0.16);
-  border: 1px solid rgba(247, 37, 133, 0.5);
-  color: #ff99c8;
-}
-
-.tool-dock {
-  display: grid;
-  grid-template-columns: repeat(9, 1fr);
-  gap: 6px;
-  pointer-events: auto;
-}
-
-.tool-slot {
-  background: rgba(13, 19, 33, 0.9);
-  border: 1.5px solid rgba(148, 163, 184, 0.25);
-  border-radius: 8px;
-  padding: 7px 6px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  cursor: pointer;
-  transition: all 0.14s ease;
-  color: var(--text-main);
-  font-family: var(--font-mono);
-}
-
-.tool-slot:hover {
-  border-color: rgba(255, 255, 255, 0.55);
-  transform: translateY(-2px);
-}
-
-.tool-slot.active {
-  background: rgba(25, 38, 66, 0.95);
-  box-shadow: 0 0 16px rgba(76, 201, 240, 0.35);
-  transform: translateY(-3px);
-}
-
-.slot-key {
-  font-size: 10px;
-  font-weight: 800;
-  padding: 1px 5px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.slot-name {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-}
-
-/* Native <dialog> Modals with light-dismiss backdrop */
 dialog {
   margin: auto;
   border: 1px solid var(--accent-blue);
-  border-radius: 14px;
+  border-radius: 12px;
   background: rgba(10, 15, 28, 0.96);
   color: var(--text-main);
-  max-width: 820px;
+  max-width: 780px;
   width: 92vw;
+  max-height: 90dvh;
+  overflow-y: auto;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.85);
   padding: 0;
 }
 
 dialog::backdrop {
-  background-color: rgba(3, 6, 14, 0.72);
-  backdrop-filter: blur(4px);
+  background-color: rgba(3, 6, 14, 0.68);
+  backdrop-filter: blur(3px);
 }
 
 .modal-inner {
-  padding: 20px 24px;
+  padding: 16px 18px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
 .modal-header {
@@ -500,12 +445,12 @@ dialog::backdrop {
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid rgba(148, 163, 184, 0.2);
-  padding-bottom: 10px;
+  padding-bottom: 8px;
 }
 
 .modal-header h2 {
   font-family: var(--font-display);
-  font-size: 18px;
+  font-size: 16px;
   color: var(--accent-cyan);
 }
 
@@ -516,51 +461,71 @@ dialog::backdrop {
   border-radius: 6px;
   padding: 4px 10px;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 11px;
   cursor: pointer;
 }
 
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .modal-intro {
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: 12px;
+  line-height: 1.45;
   color: #cbd5e1;
 }
 
 .codex-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
 }
 
 .codex-card {
   background: rgba(20, 29, 49, 0.75);
   border: 1px solid rgba(76, 201, 240, 0.22);
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 9px 11px;
 }
 
 .codex-card h3 {
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--accent-gold);
-  margin-bottom: 5px;
+  margin-bottom: 4px;
 }
 
 .codex-card p {
-  font-size: 11.5px;
-  line-height: 1.45;
+  font-size: 11px;
+  line-height: 1.4;
   color: #cbd5e1;
+}
+
+.map-card {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.map-card:hover,
+.map-card.active-map {
+  border-color: var(--accent-cyan);
+  background: rgba(15, 118, 110, 0.25);
 }
 
 .controls-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
   justify-content: space-between;
   background: rgba(0, 245, 212, 0.08);
   border: 1px solid rgba(0, 245, 212, 0.25);
   border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 11px;
+  padding: 7px 10px;
+  font-size: 10.5px;
 }
 
 .term-sector-tag {
@@ -568,39 +533,39 @@ dialog::backdrop {
   font-size: 11px;
   font-weight: 700;
   color: var(--accent-gold);
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .term-log-body {
-  font-size: 14px;
-  line-height: 1.6;
+  font-size: 13px;
+  line-height: 1.55;
   color: #e2e8f0;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .term-tip-box {
   background: rgba(0, 245, 212, 0.1);
   border-left: 3px solid var(--accent-cyan);
-  padding: 10px 14px;
+  padding: 8px 12px;
   border-radius: 6px;
-  font-size: 12.5px;
-  line-height: 1.5;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .event-body-text {
-  font-size: 14px;
-  line-height: 1.6;
-  margin-bottom: 16px;
+  font-size: 13px;
+  line-height: 1.55;
+  margin-bottom: 12px;
 }
 
 .event-actions {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
 /* ============================================================================
-   Mobile Dual-Thumbstick Touch Overlay & Horizontal (Landscape) Phone Layout
+   Clean Translucent Mobile Dual-Thumbstick Overlay
    ============================================================================ */
 .touch-controls-layer {
   position: absolute;
@@ -616,152 +581,112 @@ dialog::backdrop {
 
 .touch-cluster {
   position: absolute;
-  bottom: max(10px, env(safe-area-inset-bottom, 10px));
+  bottom: max(8px, env(safe-area-inset-bottom, 8px));
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   pointer-events: auto;
   touch-action: none;
 }
 
 .touch-cluster-left {
-  left: max(14px, env(safe-area-inset-left, 14px));
+  left: max(10px, env(safe-area-inset-left, 10px));
 }
 
 .touch-cluster-right {
-  right: max(14px, env(safe-area-inset-right, 14px));
+  right: max(10px, env(safe-area-inset-right, 10px));
 }
 
 .touch-mini-row {
   display: flex;
-  gap: 6px;
-  align-items: center;
+  gap: 5px;
 }
 
 .touch-action-btn {
-  background: rgba(15, 23, 42, 0.84);
-  border: 1.5px solid rgba(76, 201, 240, 0.45);
-  color: var(--text-main);
+  background: rgba(11, 16, 28, 0.55);
+  border: 1px solid rgba(76, 201, 240, 0.38);
+  color: rgba(241, 245, 249, 0.9);
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 9.5px;
   font-weight: 800;
-  padding: 6px 9px;
-  border-radius: 8px;
+  padding: 4px 8px;
+  border-radius: 6px;
   cursor: pointer;
-  backdrop-filter: blur(6px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
   touch-action: none;
 }
 
 .touch-action-btn.pressed {
-  transform: scale(0.93);
-  background: rgba(0, 245, 212, 0.32);
-  border-color: var(--accent-cyan);
-}
-
-.touch-bumper-btn {
-  border-color: var(--accent-gold);
-  color: var(--accent-gold);
+  transform: scale(0.92);
+  background: rgba(0, 245, 212, 0.35);
 }
 
 .touch-phase-btn {
-  border-color: #c77dff;
+  border-color: rgba(199, 125, 255, 0.5);
   color: #e0aaff;
 }
 
 .touch-lmb-btn {
-  border-color: var(--accent-cyan);
+  border-color: rgba(0, 245, 212, 0.5);
   color: var(--accent-cyan);
-  background: rgba(0, 245, 212, 0.16);
-  padding: 7px 11px;
 }
 
 .touch-rmb-btn {
-  border-color: var(--accent-pink);
+  border-color: rgba(247, 37, 133, 0.5);
   color: #ff99c8;
-  background: rgba(247, 37, 133, 0.16);
-  padding: 7px 10px;
 }
 
 .touch-stick-zone {
   position: relative;
-  width: 112px;
-  height: 112px;
+  width: 88px;
+  height: 88px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(15, 23, 42, 0.58) 0%, rgba(7, 10, 18, 0.82) 100%);
-  border: 2px solid rgba(76, 201, 240, 0.38);
+  background: rgba(11, 16, 28, 0.32);
+  border: 1.5px solid rgba(76, 201, 240, 0.32);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), inset 0 0 18px rgba(76, 201, 240, 0.14);
   touch-action: none;
 }
 
 .touch-stick-zone.active-touch {
-  border-color: var(--accent-cyan);
-  box-shadow: 0 0 20px rgba(0, 245, 212, 0.35), inset 0 0 20px rgba(0, 245, 212, 0.22);
+  border-color: rgba(0, 245, 212, 0.65);
+  background: rgba(11, 16, 28, 0.48);
 }
 
 .touch-stick-zone.jetpack-engaged {
-  border-color: var(--accent-gold);
-  box-shadow: 0 0 22px rgba(255, 209, 102, 0.5), inset 0 12px 20px rgba(255, 209, 102, 0.28);
+  border-color: rgba(255, 209, 102, 0.75);
 }
 
 .touch-stick-aim {
-  border-color: rgba(247, 37, 133, 0.42);
+  border-color: rgba(247, 37, 133, 0.32);
 }
 
 .touch-stick-aim.autofire-engaged {
-  border-color: var(--accent-pink);
-  box-shadow: 0 0 24px rgba(247, 37, 133, 0.55), inset 0 0 20px rgba(247, 37, 133, 0.28);
-}
-
-.stick-hint {
-  position: absolute;
-  font-size: 8.5px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  color: rgba(226, 232, 240, 0.55);
-  pointer-events: none;
-}
-
-.stick-hint-top {
-  top: 7px;
-}
-
-.stick-hint-bottom {
-  bottom: 7px;
+  border-color: rgba(247, 37, 133, 0.75);
 }
 
 .touch-stick-knob {
-  width: 46px;
-  height: 46px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, rgba(76, 201, 240, 0.92), rgba(15, 23, 42, 0.95));
-  border: 2px solid #e2e8f0;
-  color: #ffffff;
-  font-size: 9px;
-  font-weight: 800;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.65);
+  background: rgba(76, 201, 240, 0.55);
+  border: 1.5px solid rgba(255, 255, 255, 0.75);
   pointer-events: none;
-  transition: transform 0.03s linear;
+  transition: transform 0.02s linear;
 }
 
 .touch-stick-aim .touch-stick-knob {
-  background: radial-gradient(circle at 35% 35%, rgba(247, 37, 133, 0.92), rgba(30, 12, 38, 0.95));
+  background: rgba(247, 37, 133, 0.55);
 }
 
-/* Portrait Orientation Prompt Banner (Shown only on narrow portrait screens) */
+/* Portrait Orientation Prompt Banner */
 .rotate-device-banner {
   position: fixed;
   inset: 0;
   z-index: 50;
   background: rgba(5, 8, 16, 0.88);
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(8px);
   display: none;
   align-items: center;
   justify-content: center;
@@ -775,251 +700,121 @@ dialog::backdrop {
 .rotate-card {
   background: rgba(13, 20, 36, 0.96);
   border: 1.5px solid var(--accent-cyan);
-  border-radius: 14px;
-  padding: 22px 20px;
-  max-width: 360px;
+  border-radius: 12px;
+  padding: 18px;
+  max-width: 320px;
   text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+  gap: 8px;
 }
 
 .rotate-icon {
-  font-size: 36px;
+  font-size: 30px;
   color: var(--accent-gold);
 }
 
 .rotate-card h3 {
   font-family: var(--font-display);
-  font-size: 18px;
+  font-size: 16px;
   color: var(--accent-cyan);
 }
 
 .rotate-card p {
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: 11.5px;
+  line-height: 1.45;
   color: #cbd5e1;
 }
 
 .rotate-actions {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
-  margin-top: 6px;
+  margin-top: 4px;
 }
 
-.rotate-actions .hud-btn {
-  padding: 9px 12px;
-  font-size: 12px;
-}
-
-/* Ensure dialogs scroll cleanly on short mobile viewports */
-dialog {
-  max-height: 90dvh;
-  overflow-y: auto;
-}
-
-/* When touch controls are active, narrow the bottom tool dock so it sits between the sticks */
+/* Touch mode narrows bottom tool strip so it sits cleanly between the two sticks */
 body.touch-mode-active .hud-bottom-wrap {
-  width: min(calc(100dvw - 310px), 780px);
+  width: calc(100dvw - 224px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+  max-width: 520px;
 }
 
-/* Show Portrait Rotate Prompt on phones held vertically */
+/* Mobile Portrait Adjustments */
 @media (max-width: 680px) and (orientation: portrait) {
   .rotate-device-banner:not(.dismissed) {
     display: flex;
   }
 
-  .hud-top {
-    flex-wrap: wrap;
-    gap: 6px;
-    top: max(6px, env(safe-area-inset-top, 6px));
-  }
-
-  .hud-vitals-card {
-    min-width: 160px;
-    flex: 1;
-    padding: 6px 8px;
-  }
-
-  .hud-minimap-card {
-    padding: 6px 8px;
-  }
-
-  #minimap-canvas {
-    width: 112px;
-    height: 72px;
-  }
-
-  .hud-sector-banner {
-    order: 3;
-    min-width: 100%;
-    padding: 6px 8px;
-  }
-
-  .sector-subtitle,
-  .active-tool-banner {
+  .slot-name,
+  .bind-micro {
     display: none;
   }
 
   body.touch-mode-active .hud-bottom-wrap {
-    bottom: 162px;
-    width: 96dvw;
-  }
-
-  .tool-dock {
-    grid-template-columns: repeat(9, minmax(0, 1fr));
-    gap: 3px;
-  }
-
-  .tool-slot {
-    padding: 4px 2px;
-  }
-
-  .slot-name {
-    font-size: 8.5px;
+    bottom: 132px;
+    width: 92dvw;
   }
 }
 
-/* Horizontal (Landscape) Phone Optimization — Maximum Canvas + Ergonomic Thumb Zones */
+/* Mobile Horizontal (Landscape) Phone Adjustments — Ultra-Minimal & Unobstructed */
 @media (max-height: 540px) and (orientation: landscape) {
-  .hud-top {
-    top: max(4px, env(safe-area-inset-top, 4px));
-    left: max(8px, env(safe-area-inset-left, 8px));
-    right: max(8px, env(safe-area-inset-right, 8px));
-    gap: 6px;
+  .hud-vitals-pill {
+    width: 108px;
+    padding: 3px 6px;
+    gap: 2px;
   }
 
-  .hud-vitals-card,
-  .hud-sector-banner,
-  .hud-minimap-card {
-    padding: 5px 8px;
-    border-radius: 7px;
-  }
-
-  .hud-vitals-card {
-    min-width: 158px;
-    gap: 3px;
-  }
-
-  .brand-row {
-    display: none;
-  }
-
-  .vital-row {
-    grid-template-columns: 48px 1fr 34px;
-    font-size: 9.5px;
+  .vital-mini {
+    grid-template-columns: 20px 1fr 20px;
+    font-size: 8.5px;
     gap: 4px;
   }
 
   .bar-track {
-    height: 6px;
-  }
-
-  .sector-title {
-    font-size: 12px;
-  }
-
-  .sector-subtitle,
-  .minimap-legend {
-    display: none;
-  }
-
-  .jev-broadcast-bar {
-    padding: 2px 6px;
-    font-size: 9px;
-  }
-
-  .action-pills {
-    gap: 4px;
-    margin-top: 2px;
-  }
-
-  .hud-btn,
-  .hud-select {
-    padding: 2px 6px;
-    font-size: 9.5px;
+    height: 4px;
   }
 
   #minimap-canvas {
-    width: 108px;
-    height: 68px;
+    width: 72px;
+    height: 46px;
   }
 
-  .minimap-header {
-    font-size: 8.5px;
+  .hud-icon-btn {
+    width: 26px;
+    height: 22px;
+    font-size: 12px;
   }
 
-  /* Compact bottom dock nestled cleanly between the Left and Right virtual thumbsticks */
-  .hud-bottom-wrap,
-  body.touch-mode-active .hud-bottom-wrap {
-    bottom: max(6px, env(safe-area-inset-bottom, 6px));
-    width: calc(100dvw - 284px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
-    max-width: 620px;
-    gap: 3px;
+  .active-tool-micro {
+    padding: 1px 6px;
+    font-size: 9px;
   }
 
-  .active-tool-banner {
-    padding: 3px 8px;
-  }
-
-  .tool-desc {
+  .bind-micro {
     display: none;
   }
 
-  .tool-title {
-    font-size: 10.5px;
-  }
-
-  .bind-pill {
-    font-size: 9px;
-    padding: 2px 5px;
-  }
-
-  .tool-dock {
-    gap: 3px;
-  }
-
   .tool-slot {
-    padding: 4px 2px;
-    border-radius: 6px;
-    gap: 1px;
-  }
-
-  .slot-key {
-    font-size: 8.5px;
-    padding: 0 3px;
+    padding: 3px 1px;
   }
 
   .slot-name {
+    display: none;
+  }
+
+  .slot-key {
     font-size: 9px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 100%;
   }
 
   .touch-stick-zone {
-    width: 96px;
-    height: 96px;
+    width: 76px;
+    height: 76px;
   }
 
   .touch-stick-knob {
-    width: 40px;
-    height: 40px;
-  }
-
-  .touch-action-btn {
-    padding: 4px 7px;
-    font-size: 9.5px;
-  }
-
-  .modal-inner {
-    padding: 12px 14px;
-    gap: 8px;
+    width: 30px;
+    height: 30px;
   }
 }
-

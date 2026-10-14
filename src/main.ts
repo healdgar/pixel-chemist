@@ -195,13 +195,11 @@ const activeRmb = document.getElementById('active-rmb')!;
 
 function updateToolLabels(): void {
   const tool = TOOLS[player.selectedTool - 1];
-  activeToolTitle.textContent = `[${tool.key}] ${tool.name} (LB ◀ ▶ RB)`;
+  activeToolTitle.textContent = `[${tool.key}] ${tool.shortName}`;
   activeToolTitle.style.color = tool.color;
   activeToolDesc.textContent = tool.description;
-  const lTrig = gamepad.literalLeftRightTriggers ? 'LT' : 'RT';
-  const rTrig = gamepad.literalLeftRightTriggers ? 'RT' : 'LT';
-  activeLmb.textContent = `${tool.primaryLabel.replace('LMB:', `${lTrig} / LMB:`)}`;
-  activeRmb.textContent = `${tool.secondaryLabel.replace('RMB:', `${rTrig} / RMB:`)}`;
+  activeLmb.textContent = tool.primaryLabel;
+  activeRmb.textContent = tool.secondaryLabel;
 }
 
 function selectTool(toolId: number): void {
@@ -357,16 +355,27 @@ minimapCanvas.addEventListener('click', (e) => {
   }
 });
 
-// HUD Top Buttons & Map Selector
+// HUD Top Menu Button & Unified Field Menu Handlers
+const menuDialog = document.getElementById('menu-dialog') as HTMLDialogElement | null;
+document.getElementById('btn-menu')?.addEventListener('click', () => {
+  if (menuDialog) {
+    if (menuDialog.open) menuDialog.close();
+    else menuDialog.showModal();
+  }
+});
+
 mapSelectEl?.addEventListener('change', () => {
   loadMap(mapSelectEl.value as MapId);
   mapSelectEl.blur();
+  menuDialog?.close();
 });
 document.getElementById('btn-maps')?.addEventListener('click', () => {
+  menuDialog?.close();
   renderMapCards();
   (document.getElementById('map-dialog') as HTMLDialogElement).showModal();
 });
 const openJevModal = () => {
+  menuDialog?.close();
   renderJevTelemetryModal();
   (document.getElementById('jev-dialog') as HTMLDialogElement).showModal();
 };
@@ -415,7 +424,6 @@ document.getElementById('btn-jev-spawn')?.addEventListener('click', () => {
     weaponLoadout: jevDirector.currentLoadout,
   });
   sound.playQuantumBeam(760);
-  world.addReactionPopup(Math.floor(spawnX), Math.floor(spawnY), '🛸 J.E.V. APEX DRONE WARPED!', '#f72585');
   (document.getElementById('jev-dialog') as HTMLDialogElement).close();
 });
 
@@ -428,12 +436,15 @@ document.getElementById('btn-jev-reset-weights')?.addEventListener('click', () =
 
 document.getElementById('btn-rewind')?.addEventListener('click', rewindTime);
 document.getElementById('btn-qdash')?.addEventListener('click', () => {
+  menuDialog?.close();
   player.activateQuantumDash(sound);
 });
 document.getElementById('btn-thermal')?.addEventListener('click', () => {
   thermalVision = !thermalVision;
+  menuDialog?.close();
 });
 document.getElementById('btn-codex')?.addEventListener('click', () => {
+  menuDialog?.close();
   (document.getElementById('codex-dialog') as HTMLDialogElement).showModal();
 });
 document.getElementById('btn-touch-toggle')?.addEventListener('click', () => {
@@ -441,13 +452,17 @@ document.getElementById('btn-touch-toggle')?.addEventListener('click', () => {
 });
 document.getElementById('btn-fullscreen')?.addEventListener('click', () => {
   touchControls.requestLandscapeFullscreen();
+  menuDialog?.close();
 });
 document.getElementById('btn-mute')?.addEventListener('click', () => {
   sound.muted = !sound.muted;
   const muteBtn = document.getElementById('btn-mute')!;
   muteBtn.textContent = sound.muted ? '🔇 Muted' : '🔊 SFX';
 });
-document.getElementById('btn-reset')?.addEventListener('click', resetFacility);
+document.getElementById('btn-reset')?.addEventListener('click', () => {
+  menuDialog?.close();
+  resetFacility();
+});
 
 document.getElementById('btn-event-next-map')?.addEventListener('click', () => {
   (document.getElementById('event-dialog') as HTMLDialogElement).close();
@@ -665,15 +680,15 @@ function renderJevTelemetryModal(): void {
 function updateHud(): void {
   const hpPct = Math.max(0, Math.min(100, Math.round(player.hp)));
   hpBar.style.width = `${hpPct}%`;
-  hpText.textContent = `${hpPct}%`;
+  hpText.textContent = `${hpPct}`;
 
   const jetPct = Math.max(0, Math.min(100, Math.round(player.jetpackFuel)));
   jetBar.style.width = `${jetPct}%`;
-  jetText.textContent = `${jetPct}%`;
+  jetText.textContent = `${jetPct}`;
 
   const radPct = Math.max(0, Math.min(100, Math.round(player.radiationDose)));
   radBar.style.width = `${radPct}%`;
-  radText.textContent = `${radPct * 10} mSv`;
+  radText.textContent = `${radPct}`;
 
   if (gamepad.state.connected) {
     gamepadPill.textContent = '🎮 PAD READY';

@@ -372,10 +372,12 @@ export class WorldRenderer {
     // 7. Render Active Projectiles & Beams
     this.renderProjectiles(mainCtx, projectiles, baseCamX, baseCamY, scaleX, scaleY);
 
-    // 8. Render Floating Alchemical Reaction Formula Popups
-    this.renderReactionPopups(mainCtx, world, baseCamX, baseCamY, scaleX, scaleY);
+    // 8. Keep world reaction queue trimmed without cluttering the screen with floating text boxes
+    if (world.reactionEvents.length > 0) {
+      world.reactionEvents.length = 0;
+    }
 
-    // 9. Render Reticle & Live Chemical Pixel Inspector at Cursor
+    // 9. Render Clean Reticle (only show chemical formula badge when Thermal/Scanner mode is active)
     this.renderCursorReticle(
       mainCtx,
       world,
@@ -384,10 +386,11 @@ export class WorldRenderer {
       baseCamX,
       baseCamY,
       scaleX,
-      scaleY
+      scaleY,
+      thermalVision
     );
 
-    // 10. Render Directional Compass toward Bibbi
+    // 10. Render Subtle Edge Indicator toward Bibbi
     this.renderBibbiCompass(mainCtx, mainCanvas, player, level);
   }
 
@@ -418,19 +421,14 @@ export class WorldRenderer {
       ctx.fillRect(px - 1.5 * ex, py - 2.5 * ey, 3 * ex, 2.2 * ey);
 
       const dist = Math.hypot(player.x - term.x, player.y - term.y);
-      if (dist < 36) {
+      if (dist < 32) {
         ctx.save();
-        ctx.font = 'bold 12px "JetBrains Mono", monospace';
+        ctx.font = 'bold 10px "JetBrains Mono", monospace';
         ctx.textAlign = 'center';
-        ctx.fillStyle = 'rgba(10, 15, 28, 0.88)';
-        ctx.strokeStyle = '#00f5d4';
-        ctx.lineWidth = 1.5;
-        const label = `[E / X] ${term.title}`;
-        const tw = ctx.measureText(label).width + 16;
-        ctx.fillRect(px - tw / 2, py - 28, tw, 20);
-        ctx.strokeRect(px - tw / 2, py - 28, tw, 20);
+        ctx.fillStyle = 'rgba(10, 15, 28, 0.85)';
+        ctx.fillRect(px - 22, py - 22, 44, 15);
         ctx.fillStyle = '#00f5d4';
-        ctx.fillText(label, px, py - 14);
+        ctx.fillText('[E]', px, py - 11);
         ctx.restore();
       }
     }
@@ -556,8 +554,8 @@ export class WorldRenderer {
   private renderEnemyUnits(
     ctx: CanvasRenderingContext2D,
     level: LevelData,
-    player: Player,
-    mouseWorld: { wx: number; wy: number },
+    _player: Player,
+    _mouseWorld: { wx: number; wy: number },
     camX: number,
     camY: number,
     sx: number,
@@ -690,38 +688,19 @@ export class WorldRenderer {
         ctx.fillRect(px + (f > 0 ? 2.5 : -6.5) * ex, py - 1.8 * ey, 4.0 * ex, 2.0 * ey);
       }
 
-      // HP Bar & J.E.V. Tactical Label above unit
-      const hovered = Math.hypot(mouseWorld.wx - u.x, mouseWorld.wy - u.y) < 28;
-      const nearPlayer = Math.hypot(player.x - u.x, player.y - u.y) < 150;
-      if (u.hp < u.maxHp || hovered || nearPlayer) {
-        const barW = (u.type === 'robot' ? 8 : 6) * ex;
-        const barY = py - (u.height * 0.34 + 2.2) * ey;
+      // Minimal HP Bar above unit ONLY when damaged (no floating text clutter!)
+      if (u.hp < u.maxHp) {
+        const barW = (u.type === 'robot' ? 7 : 5) * ex;
+        const barY = py - (u.height * 0.34 + 2.0) * ey;
         ctx.fillStyle = 'rgba(10, 14, 24, 0.85)';
-        ctx.fillRect(px - barW / 2, barY, barW, 1.1 * ey);
+        ctx.fillRect(px - barW / 2, barY, barW, 0.9 * ey);
         ctx.fillStyle =
           u.cryoBrittleTimer > 0
             ? '#72efdd'
             : u.rustedLevel > 25
             ? '#ff9f1c'
             : '#ff4d6d';
-        ctx.fillRect(px - barW / 2, barY, barW * Math.max(0, u.hp / u.maxHp), 1.1 * ey);
-
-        if (hovered || u.aiState !== 'patrol') {
-          ctx.font = 'bold 10px "JetBrains Mono", monospace';
-          ctx.textAlign = 'center';
-          const statusTag =
-            u.cryoBrittleTimer > 0
-              ? ' [❄️BRITTLE]'
-              : u.rustedLevel > 15
-              ? ` [RUST ${Math.round(u.rustedLevel)}%]`
-              : '';
-          const label = `${u.name}: ${u.aiThought}${statusTag}`;
-          const tw = ctx.measureText(label).width + 10;
-          ctx.fillStyle = 'rgba(12, 16, 28, 0.85)';
-          ctx.fillRect(px - tw / 2, barY - 15, tw, 13);
-          ctx.fillStyle = '#ffccd5';
-          ctx.fillText(label, px, barY - 5);
-        }
+        ctx.fillRect(px - barW / 2, barY, barW * Math.max(0, u.hp / u.maxHp), 0.9 * ey);
       }
 
       ctx.restore();
@@ -758,39 +737,25 @@ export class WorldRenderer {
     ctx.fill();
 
     // Bibbi sprite (magenta/teal lab jacket, pigtails, expressive eyes)
-    // Hair / pigtails
     ctx.fillStyle = '#ff9f1c';
     ctx.fillRect(px - 2.5 * ex, py - 3.5 * ey, 5 * ex, 2 * ey);
-    // Head
     ctx.fillStyle = '#ffe5d9';
     ctx.fillRect(px - 1.5 * ex, py - 2.5 * ey, 3 * ex, 2.5 * ey);
-    // Eyes
     ctx.fillStyle = '#1d3557';
     ctx.fillRect(px - 1 * ex, py - 1.8 * ey, 0.7 * ex, 0.8 * ey);
     ctx.fillRect(px + 0.4 * ex, py - 1.8 * ey, 0.7 * ex, 0.8 * ey);
-    // Jacket (Magenta/Pink)
     ctx.fillStyle = '#f72585';
     ctx.fillRect(px - 2 * ex, py, 4 * ex, 3.2 * ey);
-    // Boots
     ctx.fillStyle = '#4cc9f0';
     ctx.fillRect(px - 1.6 * ex, py + 3.2 * ey, 1.2 * ex, 1.4 * ey);
     ctx.fillRect(px + 0.4 * ex, py + 3.2 * ey, 1.2 * ex, 1.4 * ey);
 
-    // Callout speech bubble
+    // Subtle compact tag above Bibbi
     ctx.save();
-    ctx.font = 'bold 12px "JetBrains Mono", monospace';
+    ctx.font = 'bold 10px "JetBrains Mono", monospace';
     ctx.textAlign = 'center';
-    const msg = b.rescued
-      ? '♥ BIBBI RESCUED! "YOU DID IT WITH ALCHEMY!" ♥'
-      : 'BIBBI: "DISSOLVE THE CYAN CHRONITON RING!"';
-    const tw = ctx.measureText(msg).width + 16;
-    ctx.fillStyle = 'rgba(20, 12, 38, 0.9)';
-    ctx.strokeStyle = b.rescued ? '#ffd166' : '#f72585';
-    ctx.lineWidth = 1.5;
-    ctx.fillRect(px - tw / 2, py - 34, tw, 20);
-    ctx.strokeRect(px - tw / 2, py - 34, tw, 20);
     ctx.fillStyle = b.rescued ? '#ffd166' : '#ff99c8';
-    ctx.fillText(msg, px, py - 20);
+    ctx.fillText(b.rescued ? '♥ RESCUED!' : '♥ BIBBI', px, py - 18);
     ctx.restore();
   }
 
@@ -881,33 +846,6 @@ export class WorldRenderer {
     }
   }
 
-  private renderReactionPopups(
-    ctx: CanvasRenderingContext2D,
-    world: WorldGrid,
-    camX: number,
-    camY: number,
-    sx: number,
-    sy: number
-  ): void {
-    ctx.save();
-    ctx.font = 'bold 11px "JetBrains Mono", monospace';
-    ctx.textAlign = 'center';
-    for (const ev of world.reactionEvents) {
-      const vx = ev.x - camX;
-      const vy = ev.y - camY;
-      if (vx < 0 || vx > this.viewW || vy < 0 || vy > this.viewH) continue;
-      const px = vx * sx;
-      const py = vy * sy;
-      ctx.globalAlpha = Math.min(1, ev.ttl / 25);
-      ctx.fillStyle = 'rgba(8, 11, 20, 0.8)';
-      const w = ctx.measureText(ev.text).width + 10;
-      ctx.fillRect(px - w / 2, py - 12, w, 15);
-      ctx.fillStyle = ev.color;
-      ctx.fillText(ev.text, px, py - 1);
-    }
-    ctx.restore();
-  }
-
   private renderCursorReticle(
     ctx: CanvasRenderingContext2D,
     world: WorldGrid,
@@ -916,7 +854,8 @@ export class WorldRenderer {
     camX: number,
     camY: number,
     sx: number,
-    sy: number
+    sy: number,
+    scannerActive: boolean
   ): void {
     const gx = Math.floor(mouseWorld.wx);
     const gy = Math.floor(mouseWorld.wy);
@@ -927,44 +866,31 @@ export class WorldRenderer {
     ctx.save();
     ctx.strokeStyle = tool.color;
     ctx.lineWidth = 1.5;
-    ctx.setLineDash([4, 3]);
     ctx.beginPath();
-    ctx.arc(px, py, 9 * sx, 0, Math.PI * 2);
+    ctx.arc(px, py, 6 * sx, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.setLineDash([]);
 
-    // Draw highlight around the exact hovered atomic pixel (now 1/4 size!)
-    const cellX = (gx - camX) * sx;
-    const cellY = (gy - camY) * sy;
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(cellX, cellY, sx, sy);
+    // Center dot
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(px - 1.5, py - 1.5, 3, 3);
 
-    if (world.inBounds(gx, gy)) {
+    // Only show chemical inspector badge when Scanner / Thermal mode [V] is active!
+    if (scannerActive && world.inBounds(gx, gy)) {
       const i = world.idx(gx, gy);
       const el = world.grid[i] as ElementId;
-      const def = ELEMENTS[el];
-      const temp = Math.round(world.temp[i]);
-      const press = world.pressure[i];
-      const flags = world.flags[i];
-
-      let badge = `${def.symbol} (${def.name}) | ${temp}°C`;
-      if (press >= 1) badge += ` | ${Math.round(press)} GPa`;
-      if (flags & FLAG_CRYO_BRITTLE) badge += ' [CRYO-BRITTLE]';
-      if (flags & FLAG_QUANTUM_TUNNEL) badge += ' [|Ψ⟩ TUNNEL]';
-      if (flags & FLAG_GLUON_LOCKED) badge += ' [GLUON-LOCK]';
-
-      ctx.font = 'bold 11px "JetBrains Mono", monospace';
-      const w = ctx.measureText(badge).width + 12;
-      const bx = Math.min(ctx.canvas.width - w - 8, Math.max(8, px + 14));
-      const by = Math.max(24, py - 12);
-
-      ctx.fillStyle = 'rgba(10, 14, 24, 0.88)';
-      ctx.strokeStyle = tool.color;
-      ctx.fillRect(bx, by - 14, w, 20);
-      ctx.strokeRect(bx, by - 14, w, 20);
-      ctx.fillStyle = '#f8f9fa';
-      ctx.fillText(badge, bx + 6, by);
+      if (el !== ElementId.EMPTY) {
+        const def = ELEMENTS[el];
+        const temp = Math.round(world.temp[i]);
+        const badge = `${def.symbol} ${temp}°C`;
+        ctx.font = 'bold 10px "JetBrains Mono", monospace';
+        const w = ctx.measureText(badge).width + 10;
+        const bx = Math.min(ctx.canvas.width - w - 8, Math.max(8, px + 10));
+        const by = Math.max(20, py - 8);
+        ctx.fillStyle = 'rgba(10, 14, 24, 0.85)';
+        ctx.fillRect(bx, by - 12, w, 16);
+        ctx.fillStyle = tool.color;
+        ctx.fillText(badge, bx + 5, by);
+      }
     }
     ctx.restore();
   }
@@ -979,23 +905,19 @@ export class WorldRenderer {
     const dx = b.x - player.x;
     const dy = b.y - player.y;
     const dist = Math.round(Math.hypot(dx, dy));
-    if (dist < 90) return; // Already on screen!
+    if (dist < 110) return;
 
     const angle = Math.atan2(dy, dx);
-    const margin = 52;
-    const cx = canvas.width / 2 + Math.cos(angle) * (canvas.width / 2 - margin * 2.2);
-    const cy = canvas.height / 2 + Math.sin(angle) * (canvas.height / 2 - margin * 1.8);
+    const cx = canvas.width / 2 + Math.cos(angle) * (canvas.width / 2 - 28);
+    const cy = canvas.height / 2 + Math.sin(angle) * (canvas.height / 2 - 28);
 
     ctx.save();
-    ctx.font = 'bold 11px "JetBrains Mono", monospace';
+    ctx.font = 'bold 10px "JetBrains Mono", monospace';
     ctx.textAlign = 'center';
-    const text = `▼ BIBBI SIGNAL (${Math.round(dist / 2)}m)`;
-    const w = ctx.measureText(text).width + 16;
-    ctx.fillStyle = 'rgba(28, 12, 42, 0.9)';
-    ctx.strokeStyle = '#f72585';
-    ctx.lineWidth = 1.5;
-    ctx.fillRect(cx - w / 2, cy - 12, w, 20);
-    ctx.strokeRect(cx - w / 2, cy - 12, w, 20);
+    const text = `♥ ${Math.round(dist / 2)}m`;
+    const w = ctx.measureText(text).width + 10;
+    ctx.fillStyle = 'rgba(28, 12, 42, 0.78)';
+    ctx.fillRect(cx - w / 2, cy - 9, w, 15);
     ctx.fillStyle = '#ff99c8';
     ctx.fillText(text, cx, cy + 2);
     ctx.restore();
