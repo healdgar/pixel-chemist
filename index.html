@@ -2,7 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <title>PIXEL CHEMIST: SAVING BIBBI — Sub-Atomic Alchemical Adventure</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -77,6 +82,12 @@
             <button id="btn-codex" class="hud-btn" title="Open Alchemical Reaction Codex [Key C / Start]">
               📖 Codex [C]
             </button>
+            <button id="btn-touch-toggle" class="hud-btn" title="Toggle Mobile Dual-Thumbstick Touch Controls">
+              📱 Touch
+            </button>
+            <button id="btn-fullscreen" class="hud-btn" title="Enter Landscape Fullscreen">
+              ⛶ Fullscreen
+            </button>
             <button id="btn-mute" class="hud-btn" title="Toggle Sound [M]">🔊 SFX</button>
             <button id="btn-reset" class="hud-btn" title="Regenerate Current Map">🔄 Reset</button>
           </div>
@@ -114,6 +125,56 @@
 
         <!-- 9-Slot Alchemical Toolbelt -->
         <nav id="tool-dock" class="tool-dock" aria-label="Alchemical Toolbelt"></nav>
+      </div>
+
+      <!-- Mobile Dual-Thumbstick & Action Cluster Overlay -->
+      <div id="touch-controls-layer" class="touch-controls-layer" aria-label="Mobile Touch Controls">
+        <!-- Left Thumb Cluster: Move + Jetpack (Up) + Bumper/Phase/Terminal -->
+        <div class="touch-cluster touch-cluster-left">
+          <div class="touch-mini-row">
+            <button id="touch-btn-prev" type="button" class="touch-action-btn touch-bumper-btn">◀ LB</button>
+            <button id="touch-btn-phase" type="button" class="touch-action-btn touch-phase-btn">🌀 |Ψ⟩</button>
+            <button id="touch-btn-term" type="button" class="touch-action-btn">💻 LOG</button>
+          </div>
+          <div id="touch-stick-left" class="touch-stick-zone">
+            <span class="stick-hint stick-hint-top">▲ JET</span>
+            <span class="stick-hint stick-hint-bottom">▼ DIVE</span>
+            <div id="touch-knob-left" class="touch-stick-knob">MOVE</div>
+          </div>
+        </div>
+
+        <!-- Right Thumb Cluster: 360° Reticle Aim + Primary/Secondary Alchemy Fire -->
+        <div class="touch-cluster touch-cluster-right">
+          <div class="touch-mini-row">
+            <button id="touch-btn-rewind" type="button" class="touch-action-btn">⏪ 5s</button>
+            <button id="touch-btn-secondary" type="button" class="touch-action-btn touch-rmb-btn">⚡ ALT</button>
+            <button id="touch-btn-primary" type="button" class="touch-action-btn touch-lmb-btn">🔥 FIRE</button>
+            <button id="touch-btn-next" type="button" class="touch-action-btn touch-bumper-btn">RB ▶</button>
+          </div>
+          <div id="touch-stick-right" class="touch-stick-zone touch-stick-aim">
+            <span class="stick-hint stick-hint-top">AIM / AUTO-FIRE</span>
+            <div id="touch-knob-right" class="touch-stick-knob">⊕ AIM</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Portrait Orientation Prompt for Mobile Phones -->
+      <div id="rotate-device-banner" class="rotate-device-banner" role="region" aria-label="Orientation Prompt">
+        <div class="rotate-card">
+          <div class="rotate-icon">📱↻</div>
+          <h3>Rotate Phone Horizontally</h3>
+          <p>
+            <strong>Pixel Chemist: Saving Bibbi</strong> is designed for widescreen horizontal hold with dual-thumbstick alchemy controls.
+          </p>
+          <div class="rotate-actions">
+            <button id="btn-lock-landscape" type="button" class="hud-btn hud-btn-accent">
+              ⛶ Lock Landscape Fullscreen
+            </button>
+            <button id="btn-dismiss-portrait" type="button" class="hud-btn">
+              Play in Portrait Anyway
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- DIALOG 0: World Map / Environment Selector -->

@@ -7,6 +7,7 @@ import { TOOLS, Projectile, updateProjectiles } from './entities/tools';
 import { WorldRenderer } from './render/renderer';
 import { SoundEngine } from './audio/soundEngine';
 import { GamepadManager } from './input/gamepadManager';
+import { TouchControlsManager } from './input/touchControls';
 import {
   JevDirector,
   JEV_LEVER_NAMES,
@@ -65,6 +66,7 @@ resizeCanvas();
 
 const sound = new SoundEngine();
 const gamepad = new GamepadManager();
+const touchControls = new TouchControlsManager();
 const jevDirector = new JevDirector();
 const world = new WorldGrid(WORLD_W, WORLD_H);
 let currentMapId: MapId = 'alpine_outdoor';
@@ -305,6 +307,17 @@ mainCanvas.addEventListener('mousemove', (e) => {
   usingGamepadAim = false;
 });
 
+mainCanvas.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'touch') {
+    mouseScreenX = e.clientX;
+    mouseScreenY = e.clientY;
+    const tapWorld = renderer.screenToWorld(e.clientX, e.clientY, mainCanvas);
+    reticleOffsetX = Math.max(-210, Math.min(210, tapWorld.wx - player.x));
+    reticleOffsetY = Math.max(-128, Math.min(128, tapWorld.wy - player.y));
+    usingGamepadAim = true;
+  }
+});
+
 mainCanvas.addEventListener('mousedown', (e) => {
   if (e.button === 0) mouseLeftDown = true;
   if (e.button === 2) mouseRightDown = true;
@@ -422,6 +435,12 @@ document.getElementById('btn-thermal')?.addEventListener('click', () => {
 });
 document.getElementById('btn-codex')?.addEventListener('click', () => {
   (document.getElementById('codex-dialog') as HTMLDialogElement).showModal();
+});
+document.getElementById('btn-touch-toggle')?.addEventListener('click', () => {
+  touchControls.toggleEnabled();
+});
+document.getElementById('btn-fullscreen')?.addEventListener('click', () => {
+  touchControls.requestLandscapeFullscreen();
 });
 document.getElementById('btn-mute')?.addEventListener('click', () => {
   sound.muted = !sound.muted;
@@ -659,6 +678,9 @@ function updateHud(): void {
   if (gamepad.state.connected) {
     gamepadPill.textContent = '🎮 PAD READY';
     gamepadPill.classList.add('connected');
+  } else if (touchControls.enabled) {
+    gamepadPill.textContent = '📱 TOUCH READY';
+    gamepadPill.classList.add('connected');
   } else {
     gamepadPill.textContent = '🎮 NO PAD';
     gamepadPill.classList.remove('connected');
@@ -731,8 +753,8 @@ function gameLoop(now: number): void {
     saveSnapshot();
   }
 
-  // Poll Gamepad State
-  const gp = gamepad.poll();
+  // Poll Gamepad + Virtual Dual-Stick Touch State
+  const gp = touchControls.applyToGamepadState(gamepad.poll());
   const openDialog = document.querySelector<HTMLDialogElement>('dialog[open]');
 
   // Handle Gamepad Edge-Triggered Buttons

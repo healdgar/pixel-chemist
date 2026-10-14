@@ -35,6 +35,9 @@ body {
   position: relative;
   width: 100vw;
   height: 100vh;
+  width: 100dvw;
+  height: 100dvh;
+  touch-action: none;
 }
 
 #game-canvas {
@@ -44,6 +47,7 @@ body {
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   cursor: crosshair;
+  touch-action: none;
 }
 
 /* Top HUD Overlay */
@@ -594,3 +598,428 @@ dialog::backdrop {
   gap: 10px;
   flex-wrap: wrap;
 }
+
+/* ============================================================================
+   Mobile Dual-Thumbstick Touch Overlay & Horizontal (Landscape) Phone Layout
+   ============================================================================ */
+.touch-controls-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 15;
+  display: none;
+}
+
+.touch-controls-layer.active {
+  display: block;
+}
+
+.touch-cluster {
+  position: absolute;
+  bottom: max(10px, env(safe-area-inset-bottom, 10px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.touch-cluster-left {
+  left: max(14px, env(safe-area-inset-left, 14px));
+}
+
+.touch-cluster-right {
+  right: max(14px, env(safe-area-inset-right, 14px));
+}
+
+.touch-mini-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.touch-action-btn {
+  background: rgba(15, 23, 42, 0.84);
+  border: 1.5px solid rgba(76, 201, 240, 0.45);
+  color: var(--text-main);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 6px 9px;
+  border-radius: 8px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  touch-action: none;
+}
+
+.touch-action-btn.pressed {
+  transform: scale(0.93);
+  background: rgba(0, 245, 212, 0.32);
+  border-color: var(--accent-cyan);
+}
+
+.touch-bumper-btn {
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+}
+
+.touch-phase-btn {
+  border-color: #c77dff;
+  color: #e0aaff;
+}
+
+.touch-lmb-btn {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+  background: rgba(0, 245, 212, 0.16);
+  padding: 7px 11px;
+}
+
+.touch-rmb-btn {
+  border-color: var(--accent-pink);
+  color: #ff99c8;
+  background: rgba(247, 37, 133, 0.16);
+  padding: 7px 10px;
+}
+
+.touch-stick-zone {
+  position: relative;
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(15, 23, 42, 0.58) 0%, rgba(7, 10, 18, 0.82) 100%);
+  border: 2px solid rgba(76, 201, 240, 0.38);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), inset 0 0 18px rgba(76, 201, 240, 0.14);
+  touch-action: none;
+}
+
+.touch-stick-zone.active-touch {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 20px rgba(0, 245, 212, 0.35), inset 0 0 20px rgba(0, 245, 212, 0.22);
+}
+
+.touch-stick-zone.jetpack-engaged {
+  border-color: var(--accent-gold);
+  box-shadow: 0 0 22px rgba(255, 209, 102, 0.5), inset 0 12px 20px rgba(255, 209, 102, 0.28);
+}
+
+.touch-stick-aim {
+  border-color: rgba(247, 37, 133, 0.42);
+}
+
+.touch-stick-aim.autofire-engaged {
+  border-color: var(--accent-pink);
+  box-shadow: 0 0 24px rgba(247, 37, 133, 0.55), inset 0 0 20px rgba(247, 37, 133, 0.28);
+}
+
+.stick-hint {
+  position: absolute;
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: rgba(226, 232, 240, 0.55);
+  pointer-events: none;
+}
+
+.stick-hint-top {
+  top: 7px;
+}
+
+.stick-hint-bottom {
+  bottom: 7px;
+}
+
+.touch-stick-knob {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, rgba(76, 201, 240, 0.92), rgba(15, 23, 42, 0.95));
+  border: 2px solid #e2e8f0;
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.65);
+  pointer-events: none;
+  transition: transform 0.03s linear;
+}
+
+.touch-stick-aim .touch-stick-knob {
+  background: radial-gradient(circle at 35% 35%, rgba(247, 37, 133, 0.92), rgba(30, 12, 38, 0.95));
+}
+
+/* Portrait Orientation Prompt Banner (Shown only on narrow portrait screens) */
+.rotate-device-banner {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(5, 8, 16, 0.88);
+  backdrop-filter: blur(10px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.rotate-device-banner.dismissed {
+  display: none !important;
+}
+
+.rotate-card {
+  background: rgba(13, 20, 36, 0.96);
+  border: 1.5px solid var(--accent-cyan);
+  border-radius: 14px;
+  padding: 22px 20px;
+  max-width: 360px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+}
+
+.rotate-icon {
+  font-size: 36px;
+  color: var(--accent-gold);
+}
+
+.rotate-card h3 {
+  font-family: var(--font-display);
+  font-size: 18px;
+  color: var(--accent-cyan);
+}
+
+.rotate-card p {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #cbd5e1;
+}
+
+.rotate-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin-top: 6px;
+}
+
+.rotate-actions .hud-btn {
+  padding: 9px 12px;
+  font-size: 12px;
+}
+
+/* Ensure dialogs scroll cleanly on short mobile viewports */
+dialog {
+  max-height: 90dvh;
+  overflow-y: auto;
+}
+
+/* When touch controls are active, narrow the bottom tool dock so it sits between the sticks */
+body.touch-mode-active .hud-bottom-wrap {
+  width: min(calc(100dvw - 310px), 780px);
+}
+
+/* Show Portrait Rotate Prompt on phones held vertically */
+@media (max-width: 680px) and (orientation: portrait) {
+  .rotate-device-banner:not(.dismissed) {
+    display: flex;
+  }
+
+  .hud-top {
+    flex-wrap: wrap;
+    gap: 6px;
+    top: max(6px, env(safe-area-inset-top, 6px));
+  }
+
+  .hud-vitals-card {
+    min-width: 160px;
+    flex: 1;
+    padding: 6px 8px;
+  }
+
+  .hud-minimap-card {
+    padding: 6px 8px;
+  }
+
+  #minimap-canvas {
+    width: 112px;
+    height: 72px;
+  }
+
+  .hud-sector-banner {
+    order: 3;
+    min-width: 100%;
+    padding: 6px 8px;
+  }
+
+  .sector-subtitle,
+  .active-tool-banner {
+    display: none;
+  }
+
+  body.touch-mode-active .hud-bottom-wrap {
+    bottom: 162px;
+    width: 96dvw;
+  }
+
+  .tool-dock {
+    grid-template-columns: repeat(9, minmax(0, 1fr));
+    gap: 3px;
+  }
+
+  .tool-slot {
+    padding: 4px 2px;
+  }
+
+  .slot-name {
+    font-size: 8.5px;
+  }
+}
+
+/* Horizontal (Landscape) Phone Optimization — Maximum Canvas + Ergonomic Thumb Zones */
+@media (max-height: 540px) and (orientation: landscape) {
+  .hud-top {
+    top: max(4px, env(safe-area-inset-top, 4px));
+    left: max(8px, env(safe-area-inset-left, 8px));
+    right: max(8px, env(safe-area-inset-right, 8px));
+    gap: 6px;
+  }
+
+  .hud-vitals-card,
+  .hud-sector-banner,
+  .hud-minimap-card {
+    padding: 5px 8px;
+    border-radius: 7px;
+  }
+
+  .hud-vitals-card {
+    min-width: 158px;
+    gap: 3px;
+  }
+
+  .brand-row {
+    display: none;
+  }
+
+  .vital-row {
+    grid-template-columns: 48px 1fr 34px;
+    font-size: 9.5px;
+    gap: 4px;
+  }
+
+  .bar-track {
+    height: 6px;
+  }
+
+  .sector-title {
+    font-size: 12px;
+  }
+
+  .sector-subtitle,
+  .minimap-legend {
+    display: none;
+  }
+
+  .jev-broadcast-bar {
+    padding: 2px 6px;
+    font-size: 9px;
+  }
+
+  .action-pills {
+    gap: 4px;
+    margin-top: 2px;
+  }
+
+  .hud-btn,
+  .hud-select {
+    padding: 2px 6px;
+    font-size: 9.5px;
+  }
+
+  #minimap-canvas {
+    width: 108px;
+    height: 68px;
+  }
+
+  .minimap-header {
+    font-size: 8.5px;
+  }
+
+  /* Compact bottom dock nestled cleanly between the Left and Right virtual thumbsticks */
+  .hud-bottom-wrap,
+  body.touch-mode-active .hud-bottom-wrap {
+    bottom: max(6px, env(safe-area-inset-bottom, 6px));
+    width: calc(100dvw - 284px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+    max-width: 620px;
+    gap: 3px;
+  }
+
+  .active-tool-banner {
+    padding: 3px 8px;
+  }
+
+  .tool-desc {
+    display: none;
+  }
+
+  .tool-title {
+    font-size: 10.5px;
+  }
+
+  .bind-pill {
+    font-size: 9px;
+    padding: 2px 5px;
+  }
+
+  .tool-dock {
+    gap: 3px;
+  }
+
+  .tool-slot {
+    padding: 4px 2px;
+    border-radius: 6px;
+    gap: 1px;
+  }
+
+  .slot-key {
+    font-size: 8.5px;
+    padding: 0 3px;
+  }
+
+  .slot-name {
+    font-size: 9px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+
+  .touch-stick-zone {
+    width: 96px;
+    height: 96px;
+  }
+
+  .touch-stick-knob {
+    width: 40px;
+    height: 40px;
+  }
+
+  .touch-action-btn {
+    padding: 4px 7px;
+    font-size: 9.5px;
+  }
+
+  .modal-inner {
+    padding: 12px 14px;
+    gap: 8px;
+  }
+}
+
