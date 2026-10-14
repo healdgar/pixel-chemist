@@ -123,7 +123,7 @@ export class Player {
 
     const ignoreSolids = this.quantumPhaseTimer > 0;
 
-    // Horizontal collision & Terraria-style 1-6 pixel auto-step
+    // Horizontal collision & Terraria-style 1-6 pixel auto-step + wading through loose powder/frost
     const nextX = this.x + this.vx;
     if (!this.checkCollision(nextX, this.y, world, ignoreSolids)) {
       this.x = nextX;
@@ -139,7 +139,14 @@ export class Player {
         }
       }
       if (!stepped) {
-        this.vx = 0;
+        // Check if blocked only by loose granular powder (sand, rust, salt) or 1-2 stray frost specks
+        if (this.canWadeThroughLooseMatter(nextX, this.y, world)) {
+          this.displaceLooseMatter(nextX, this.y, Math.sign(this.vx) || this.facing, world);
+          this.vx *= 0.82;
+          this.x = this.x + this.vx;
+        } else {
+          this.vx = 0;
+        }
       }
     }
 
@@ -147,6 +154,12 @@ export class Player {
     const nextY = this.y + this.vy;
     if (!this.checkCollision(this.x, nextY, world, ignoreSolids)) {
       this.y = nextY;
+      this.grounded = false;
+    } else if (this.vy < 0 && this.canWadeThroughLooseMatter(this.x, nextY, world)) {
+      // Push through loose powder or stray 1-2px mid-air ice crystals when jetpacking upward
+      this.displaceLooseMatter(this.x, nextY, this.facing, world);
+      this.vy *= 0.85;
+      this.y = this.y + this.vy;
       this.grounded = false;
     } else {
       if (this.vy > 0) {
@@ -161,12 +174,16 @@ export class Player {
 
     // If player ends up inside solid rock after Quantum Tunneling wears off, gently displace upward or activate brief tunnel
     if (!ignoreSolids && this.checkCollision(this.x, this.y, world, false)) {
-      const cx = Math.floor(this.x);
-      const cy = Math.floor(this.y);
-      if (world.inBounds(cx, cy)) {
-        world.flags[world.idx(cx, cy)] |= FLAG_QUANTUM_TUNNEL;
+      if (this.canWadeThroughLooseMatter(this.x, this.y, world)) {
+        this.displaceLooseMatter(this.x, this.y, this.facing, world);
+      } else {
+        const cx = Math.floor(this.x);
+        const cy = Math.floor(this.y);
+        if (world.inBounds(cx, cy)) {
+          world.flags[world.idx(cx, cy)] |= FLAG_QUANTUM_TUNNEL;
+        }
+        this.y -= 1.0;
       }
-      this.y -= 1.0;
     }
 
     // Environmental hazard & alchemy interactions with player's Hazmat Suit
@@ -191,6 +208,76 @@ export class Player {
       }
     }
     return false;
+  }
+
+  /**
+   * Returns true if the player's hitbox at (cx, cy) has NO structural solids (except at most 2
+   * isolated mid-air ICE specks), meaning the obstacle is just loose granular powder/frost.
+   */
+  private canWadeThroughLooseMatter(cx: number, cy: number, world: WorldGrid): boolean {
+    const halfW = Math.floor(this.width / 2);
+    const halfH = Math.floor(this.height / 2);
+    let iceSpecks = 0;
+
+    for (let py = Math.floor(cy - halfH); py <= Math.floor(cy + halfH); py++) {
+      for (let px = Math.floor(cx - halfW); px <= Math.floor(cx + halfW); px++) {
+        if (!world.inBounds(px, py)) return false;
+        const i = world.idx(px, py);
+        if ((world.flags[i] & FLAG_QUANTUM_TUNNEL) !== 0) continue;
+        const el = world.grid[i] as ElementId;
+        const state = ELEMENTS[el].state;
+        if (state === 'solid') {
+          if (el === ElementId.ICE) {
+            iceSpecks++;
+            if (iceSpecks > 2) return false;
+          } else {
+            return false;
+          }
+        }
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Pushes loose powder grains aside/upward as the player wades through a pile, and crunches
+   * any isolated 1-2px mid-air ICE specks.
+   */
+  private displaceLooseMatter(cx: number, cy: number, dir: number, world: WorldGrid): void {
+    const halfW = Math.floor(this.width / 2);
+    const halfH = Math.floor(this.height / 2);
+    const pushDir = dir >= 0 ? 1 : -1;
+
+    for (let py = Math.floor(cy - halfH); py <= Math.floor(cy + halfH); py++) {
+      for (let px = Math.floor(cx - halfW); px <= Math.floor(cx + halfW); px++) {
+        if (!world.inBounds(px, py)) continue;
+        const el = world.getElement(px, py);
+        const state = ELEMENTS[el].state;
+        if (el === ElementId.ICE) {
+          world.setElement(px, py, ElementId.WATER, 2);
+        } else if (state === 'powder') {
+          const i = world.idx(px, py);
+          // Try kicking the grain forward & slightly up in the direction of movement
+          let moved = false;
+          for (let step = 1; step <= 4; step++) {
+            const tx = px + pushDir * (halfW + step);
+            const ty = py - (step & 1);
+            if (world.inBounds(tx, ty)) {
+              const targetEl = world.getElement(tx, ty);
+              const targetState = ELEMENTS[targetEl].state;
+              if (targetEl === ElementId.EMPTY || targetState === 'gas' || targetState === 'liquid') {
+                world.swap(i, world.idx(tx, ty));
+                moved = true;
+                break;
+              }
+            }
+          }
+          if (!moved) {
+            world.setElement(px, py, ElementId.EMPTY);
+          }
+        }
+      }
+    }
   }
 
   private sampleEnvironment(world: WorldGrid, sound: SoundEngine): void {

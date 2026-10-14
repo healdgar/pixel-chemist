@@ -130,6 +130,8 @@ export class WorldGrid {
         return 28 + ((this.rngState >>> 4) & 31);
       case ElementId.SMOKE:
         return 90 + ((this.rngState >>> 4) & 63);
+      case ElementId.NITROGEN_GAS:
+        return 110 + ((this.rngState >>> 4) & 63);
       case ElementId.STEAM:
         return 150 + ((this.rngState >>> 4) & 127);
       case ElementId.PLASMA:
@@ -273,10 +275,22 @@ export class WorldGrid {
           continue;
         }
 
-        // Check Cryo-Brittle shatter!
+        // Check Cryo-Brittle shatter! Crumble into falling granular rubble + frost plume
         const isCryo = (this.flags[i] & FLAG_CRYO_BRITTLE) !== 0 || this.temp[i] <= -110 || el === ElementId.CRYO_GLASS;
         if (isCryo && def.state === 'solid' && this.pressure[i] >= 28 && el !== ElementId.GLUON_BARRIER) {
-          this.setElement(x, y, el === ElementId.STEEL ? ElementId.RUST : ElementId.ICE, this.temp[i]);
+          if (el === ElementId.ICE) {
+            this.setElement(x, y, this.fastRand() < 0.55 ? ElementId.NITROGEN_GAS : ElementId.WATER, -5);
+          } else if (this.fastRand() < 0.35) {
+            this.setElement(x, y, ElementId.NITROGEN_GAS, -120);
+          } else {
+            const rubble =
+              el === ElementId.STEEL || el === ElementId.CRYO_GLASS
+                ? ElementId.RUST
+                : def.pressureInto && ELEMENTS[def.pressureInto].state === 'powder'
+                  ? def.pressureInto
+                  : ElementId.SAND;
+            this.setElement(x, y, rubble, this.temp[i]);
+          }
           shatteredCryo = true;
           continue;
         }
@@ -469,6 +483,7 @@ export class WorldGrid {
           return;
         } else if (
           el === ElementId.SMOKE ||
+          el === ElementId.NITROGEN_GAS ||
           el === ElementId.STEAM ||
           el === ElementId.PLASMA ||
           el === ElementId.QUARK_PLASMA ||
@@ -477,6 +492,8 @@ export class WorldGrid {
         ) {
           if (el === ElementId.STEAM && this.temp[i] < 95) {
             this.setElement(x, y, ElementId.WATER, 60);
+          } else if (el === ElementId.NITROGEN_GAS) {
+            this.setElement(x, y, ElementId.EMPTY, Math.min(22, this.temp[i] + 60));
           } else {
             this.setElement(x, y, ElementId.EMPTY, 25);
           }
@@ -551,6 +568,11 @@ export class WorldGrid {
 
     // 7. Phase Transitions (Melting / Boiling / Freezing)
     const curTemp = this.temp[i];
+    if (el === ElementId.NITROGEN_GAS && curTemp >= -35) {
+      // Cold nitrogen vapor warms into ambient room air (78% N2) without a violent boil pressure spike
+      this.setElement(x, y, ElementId.EMPTY, curTemp);
+      return;
+    }
     if (def.meltPoint !== undefined && curTemp >= def.meltPoint && def.meltInto !== undefined) {
       this.setElement(x, y, def.meltInto, curTemp);
       if (el === ElementId.THERMITE) {
@@ -567,6 +589,22 @@ export class WorldGrid {
     if (def.freezePoint !== undefined && curTemp <= def.freezePoint && def.freezeInto !== undefined) {
       this.setElement(x, y, def.freezeInto, curTemp);
       return;
+    }
+
+    // 8. Unanchored mid-air Ice crystals (e.g., frozen steam/mist droplets) fall under gravity instead of floating
+    if (el === ElementId.ICE && y < this.height - 2) {
+      const belowIdx = (y + 1) * this.width + x;
+      const belowEl = this.grid[belowIdx] as ElementId;
+      const belowState = ELEMENTS[belowEl].state;
+      if (belowEl === ElementId.EMPTY || belowState === 'gas') {
+        let solidNeighbors = 0;
+        if (x > 1 && ELEMENTS[this.grid[i - 1] as ElementId].state === 'solid') solidNeighbors++;
+        if (x < this.width - 2 && ELEMENTS[this.grid[i + 1] as ElementId].state === 'solid') solidNeighbors++;
+        if (y > 1 && ELEMENTS[this.grid[i - this.width] as ElementId].state === 'solid') solidNeighbors++;
+        if (solidNeighbors < 2) {
+          this.swap(i, belowIdx);
+        }
+      }
     }
   }
 
