@@ -830,7 +830,7 @@ function updateBibbiStatus(): void {
     bibbiPill.style.borderColor = hpPct < 45 ? '#ff0055' : '#06d6a0';
     bibbiPill.style.color = hpPct < 45 ? '#ff4d6d' : '#06d6a0';
   } else {
-    bibbiPill.textContent = `♥ BIBBI: ${hpPct}%`;
+    bibbiPill.textContent = hpPct < 100 ? `♥ BIBBI: ${hpPct}%` : 'BIBBI: IN STASIS';
     bibbiPill.style.background = hpPct < 100 ? 'rgba(255, 0, 85, 0.22)' : 'rgba(247, 37, 133, 0.2)';
     bibbiPill.style.borderColor = hpPct < 100 ? '#ff0055' : 'rgba(247, 37, 133, 0.5)';
     bibbiPill.style.color = hpPct < 100 ? '#ff4d6d' : '#ff99c8';
