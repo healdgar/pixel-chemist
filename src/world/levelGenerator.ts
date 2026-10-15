@@ -110,9 +110,20 @@ export interface SectorZone {
 export interface BibbiState {
   x: number;
   y: number;
+  hp: number;
+  maxHp: number;
+  carried: boolean;
   rescued: boolean;
   inDanger: boolean;
   cageIntactCount: number;
+  hurtReason?: string;
+}
+
+export interface EscapeVehicle {
+  x: number;
+  y: number;
+  name: string;
+  type: 'dropship' | 'chopper' | 'airship' | 'shuttle' | 'submersible' | 'drillpod';
 }
 
 export interface LevelData {
@@ -120,6 +131,7 @@ export interface LevelData {
   spawnX: number;
   spawnY: number;
   bibbi: BibbiState;
+  escapeVehicle: EscapeVehicle;
   terminals: LabTerminal[];
   turrets: LabTurret[];
   enemyUnits?: EnemyUnit[];
@@ -585,13 +597,13 @@ function createJevForcesForMap(mapId: MapId): {
     default:
       return {
         enemyUnits: [
-          makeUnit('lab-g1', 'guard', 'Acid Vat Hazmat Guard', 125, 102, 70, 175),
-          makeUnit('lab-g2', 'guard', 'Foundry Thermal Guard', 430, 102, 380, 490),
-          makeUnit('lab-g3', 'guard', 'Reactor Isotope Guard', 440, 218, 385, 495),
+          makeUnit('lab-g1', 'guard', 'Cryo-Wing Hazmat Guard', 150, 64, 126, 174),
+          makeUnit('lab-g2', 'guard', 'Refinery Catwalk Guard', 390, 98, 376, 404),
+          makeUnit('lab-g3', 'guard', 'Reactor Deck Guard', 405, 166, 390, 424),
           makeUnit('lab-d1', 'drone', 'Alchemy Hub Hunter-Drone', 280, 165, 220, 340),
           makeUnit('lab-d2', 'drone', 'Cryo-Wing Wasp-Drone', 115, 185, 60, 175),
-          makeUnit('lab-r1', 'robot', 'Aethelgard Goliath Mech', 120, 316, 65, 175),
-          makeUnit('lab-r2', 'robot', 'Deep Core Warden Mech', 235, 320, 210, 260),
+          makeUnit('lab-r1', 'robot', 'Aethelgard Goliath Mech', 100, 316, 65, 122),
+          makeUnit('lab-r2', 'robot', 'Deep Core Warden Mech', 242, 276, 232, 255),
         ],
         defenses: [
           {
@@ -653,6 +665,8 @@ function scaleLevelData(data: LevelData, S: number): LevelData {
   data.spawnY = Math.round(data.spawnY * S);
   data.bibbi.x = Math.round(data.bibbi.x * S);
   data.bibbi.y = Math.round(data.bibbi.y * S);
+  data.escapeVehicle.x = Math.round(data.escapeVehicle.x * S);
+  data.escapeVehicle.y = Math.round(data.escapeVehicle.y * S);
   for (const t of data.terminals) {
     t.x = Math.round(t.x * S);
     t.y = Math.round(t.y * S);
@@ -806,13 +820,17 @@ function generateAlpineOutdoor(world: WorldGrid): LevelData {
   const bx = 290;
   const by = 306;
   buildBibbiPod(bx, by);
+  // Build flat Steel Extraction Pad on West Alpine Ridge for the waiting Dropship
+  carveRect(36, 78, 76, 107, 10);
+  fillRect(38, 108, 74, 112, ElementId.STEEL, 15, 0, 10);
   sealWorldBorders();
 
   return {
     mapInfo,
     spawnX: 85,
     spawnY: 95,
-    bibbi: { x: bx, y: by, rescued: false, inDanger: false, cageIntactCount: 100 },
+    bibbi: { x: bx, y: by, hp: 100, maxHp: 100, carried: false, rescued: false, inDanger: false, cageIntactCount: 100 },
+    escapeVehicle: { x: 54, y: 100, name: 'Cryo-VTOL Dropship', type: 'dropship' },
     terminals: [
       {
         id: 'alpine-1',
@@ -851,7 +869,7 @@ function generateAlpineOutdoor(world: WorldGrid): LevelData {
     turrets: [
       { x: 250, y: 102, hp: 100, maxHp: 100, cooldown: 65, active: true, type: 'kinetic' },
       { x: 455, y: 96, hp: 100, maxHp: 100, cooldown: 70, active: true, type: 'thermal' },
-      { x: 290, y: 215, hp: 130, maxHp: 130, cooldown: 60, active: true, type: 'kinetic' },
+      { x: 290, y: 215, hp: 130, maxHp: 130, cooldown: 60, active: true, 'type': 'kinetic' },
     ],
     sectors: [
       {
@@ -972,9 +990,10 @@ function generateOfficeTower(world: WorldGrid): LevelData {
 
   return {
     mapInfo,
-    spawnX: 70,
-    spawnY: 68, // Spawn on the Penthouse Helipad overlooking the city!
-    bibbi: { x: bx, y: by, rescued: false, inDanger: false, cageIntactCount: 100 },
+    spawnX: 82,
+    spawnY: 68, // Spawn on the Penthouse Helipad next to the Stealth Chopper!
+    bibbi: { x: bx, y: by, hp: 100, maxHp: 100, carried: false, rescued: false, inDanger: false, cageIntactCount: 100 },
+    escapeVehicle: { x: 58, y: 72, name: 'Stealth Extraction Chopper', type: 'chopper' },
     terminals: [
       {
         id: 'office-1',
@@ -1131,13 +1150,15 @@ function generateCastleKeep(world: WorldGrid): LevelData {
   const bx = 280;
   const by = 304;
   buildBibbiPod(bx, by);
+  fillRect(18, 184, 54, 188, ElementId.STEEL, 20, 0, 10);
   sealWorldBorders();
 
   return {
     mapInfo,
-    spawnX: 42,
+    spawnX: 52,
     spawnY: 170,
-    bibbi: { x: bx, y: by, rescued: false, inDanger: false, cageIntactCount: 100 },
+    bibbi: { x: bx, y: by, hp: 100, maxHp: 100, carried: false, rescued: false, inDanger: false, cageIntactCount: 100 },
+    escapeVehicle: { x: 28, y: 176, name: 'Alchemical Sky-Skiff', type: 'airship' },
     terminals: [
       {
         id: 'castle-1',
@@ -1231,6 +1252,8 @@ function generateSpaceStation(world: WorldGrid): LevelData {
   carveRect(48, 130, 172, 220, 4, ElementId.STEEL, 5);
   fillRect(168, 155, 176, 195, ElementId.CRYO_GLASS, -180, FLAG_CRYO_BRITTLE, 4); // Airlock door
   fillRect(60, 195, 120, 216, ElementId.LIQUID_NITROGEN, -196, 0, 4);
+  // Steel Docking Deck above the LN2 cryo-fuel tank for Shuttle Hermes-7 & Player spawn!
+  fillRect(52, 184, 156, 188, ElementId.STEEL, 22, 0, 4);
 
   // 3. Upper Bio-Hydroponics Glass Dome (UP: x: 205..355, y: 32..112)
   carveRect(208, 36, 352, 110, 1, ElementId.GLASS, 4);
@@ -1273,9 +1296,10 @@ function generateSpaceStation(world: WorldGrid): LevelData {
 
   return {
     mapInfo,
-    spawnX: 95,
-    spawnY: 175,
-    bibbi: { x: bx, y: by, rescued: false, inDanger: false, cageIntactCount: 100 },
+    spawnX: 102,
+    spawnY: 172,
+    bibbi: { x: bx, y: by, hp: 100, maxHp: 100, carried: false, rescued: false, inDanger: false, cageIntactCount: 100 },
+    escapeVehicle: { x: 68, y: 175, name: 'Escape Shuttle Hermes-7', type: 'shuttle' },
     terminals: [
       {
         id: 'space-1',
@@ -1399,9 +1423,10 @@ function generateMagmaTrench(world: WorldGrid): LevelData {
 
   return {
     mapInfo,
-    spawnX: 90,
+    spawnX: 98,
     spawnY: 65,
-    bibbi: { x: bx, y: by, rescued: false, inDanger: false, cageIntactCount: 100 },
+    bibbi: { x: bx, y: by, hp: 100, maxHp: 100, carried: false, rescued: false, inDanger: false, cageIntactCount: 100 },
+    escapeVehicle: { x: 68, y: 72, name: 'Deep-Sea Bathysphere', type: 'submersible' },
     terminals: [
       {
         id: 'magma-1',
@@ -1610,9 +1635,10 @@ export function generateUndergroundLab(world: WorldGrid): LevelData {
 
   return {
     mapInfo,
-    spawnX: 280,
-    spawnY: 58,
-    bibbi: { x: bx, y: by, rescued: false, inDanger: false, cageIntactCount: 100 },
+    spawnX: 250,
+    spawnY: 60,
+    bibbi: { x: bx, y: by, hp: 100, maxHp: 100, carried: false, rescued: false, inDanger: false, cageIntactCount: 100 },
+    escapeVehicle: { x: 280, y: 42, name: 'Subterranean Extraction Pod', type: 'drillpod' },
     terminals: [
       {
         id: 'term-entry',

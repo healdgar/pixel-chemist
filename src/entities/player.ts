@@ -24,6 +24,7 @@ export class Player {
 
   public facing: 1 | -1 = 1;
   public grounded: boolean = false;
+  public carryingBibbi: boolean = false;
   public quantumPhaseTimer: number = 0; // >0 means player can walk through any solid wall!
   public fireCooldown: number = 0;
   public selectedTool: number = 1; // 1..9
@@ -34,7 +35,33 @@ export class Player {
     this.y = y;
   }
 
+  public createSnapshot() {
+    return {
+      x: this.x, y: this.y, vx: this.vx, vy: this.vy,
+      hp: this.hp, maxHp: this.maxHp,
+      jetpackFuel: this.jetpackFuel, maxJetpack: this.maxJetpack,
+      oxygen: this.oxygen, maxOxygen: this.maxOxygen,
+      submerged: this.submerged, radiationDose: this.radiationDose, bodyTemp: this.bodyTemp,
+      facing: this.facing, grounded: this.grounded,
+      carryingBibbi: this.carryingBibbi,
+      quantumPhaseTimer: this.quantumPhaseTimer, fireCooldown: this.fireCooldown,
+      selectedTool: this.selectedTool, gravityScale: this.gravityScale,
+    };
+  }
+
+  public restoreSnapshot(snapshot: ReturnType<Player['createSnapshot']>): void {
+    Object.assign(this, snapshot);
+  }
+
+  public reset(x: number, y: number, gravityScale: number): void {
+    const fresh = new Player(x, y);
+    fresh.gravityScale = gravityScale;
+    fresh.selectedTool = this.selectedTool;
+    this.restoreSnapshot(fresh.createSnapshot());
+  }
+
   public activateQuantumDash(sound: SoundEngine): void {
+    if (this.hp <= 0) return;
     if (this.quantumPhaseTimer <= 10) {
       this.quantumPhaseTimer = 150; // 2.5 seconds of pure Quantum Tunneling!
       sound.playQuantumBeam(660);
@@ -47,6 +74,7 @@ export class Player {
     sound: SoundEngine,
     gp?: GamepadState
   ): void {
+    if (this.hp <= 0) return;
     if (this.fireCooldown > 0) this.fireCooldown--;
     if (this.quantumPhaseTimer > 0) this.quantumPhaseTimer--;
 
@@ -58,8 +86,9 @@ export class Player {
     const gpX = gp && gp.connected ? gp.moveX : 0;
     const gpY = gp && gp.connected ? gp.moveY : 0;
 
-    const accel = 0.54;
-    const maxSpeed = 3.2;
+    // Carrying Bibbi on your back adds mass: slightly lower sprint speed, heavier jetpack load, faster fuel burn
+    const accel = this.carryingBibbi ? 0.45 : 0.54;
+    const maxSpeed = this.carryingBibbi ? 2.68 : 3.2;
 
     if (kbLeft || gpX < -0.1) {
       const intensity = kbLeft ? 1 : Math.min(1, Math.abs(gpX));
@@ -81,14 +110,19 @@ export class Player {
 
     if (moveUp) {
       const thrustScale = stickJetpackIntensity > 0 ? Math.max(0.55, stickJetpackIntensity) : 1.0;
+      const liftoffVy = this.carryingBibbi ? -2.85 : -3.4;
+      const maxClimbVy = this.carryingBibbi ? -2.35 : -3.3;
+      const jetThrust = this.carryingBibbi ? 0.35 : 0.48;
+      const fuelBurn = this.carryingBibbi ? 0.68 : 0.48;
+
       if (this.grounded) {
         // Immediate liftoff into jetpack flight when pushing Up on Left Thumbstick or pressing Jump!
-        this.vy = -3.4 * thrustScale;
+        this.vy = liftoffVy * thrustScale;
         this.grounded = false;
         sound.playJetpackThrust();
       } else if (this.jetpackFuel > 0) {
-        this.vy = Math.max(-3.3 * thrustScale, this.vy - 0.48 * thrustScale);
-        this.jetpackFuel = Math.max(0, this.jetpackFuel - 0.48 * thrustScale);
+        this.vy = Math.max(maxClimbVy * thrustScale, this.vy - jetThrust * thrustScale);
+        this.jetpackFuel = Math.max(0, this.jetpackFuel - fuelBurn * thrustScale);
         sound.playJetpackThrust();
         // Spawn tiny exhaust spark occasionally
         if (Math.random() < 0.45) {
@@ -100,7 +134,10 @@ export class Player {
         }
       }
     } else {
-      this.jetpackFuel = Math.min(this.maxJetpack, this.jetpackFuel + (this.grounded ? 1.8 : 0.65));
+      this.jetpackFuel = Math.min(
+        this.maxJetpack,
+        this.jetpackFuel + (this.grounded ? 1.8 : this.carryingBibbi ? 0.42 : 0.65)
+      );
       if (this.grounded && Math.abs(this.vx) > 0.7) {
         sound.playFootstep(false);
       }
@@ -118,8 +155,12 @@ export class Player {
       }
     }
 
-    // Gravity (scaled by environment, e.g. 0.45G on Space Station!)
-    this.vy = Math.min(4.4 * this.gravityScale, this.vy + 0.21 * this.gravityScale);
+    // Gravity (scaled by environment and increased by Bibbi's mass when piggybacking!)
+    const massMultiplier = this.carryingBibbi ? 1.28 : 1.0;
+    this.vy = Math.min(
+      4.6 * this.gravityScale * massMultiplier,
+      this.vy + 0.21 * this.gravityScale * massMultiplier
+    );
 
     const ignoreSolids = this.quantumPhaseTimer > 0;
 
@@ -392,7 +433,7 @@ export class Player {
     _world: WorldGrid,
     sound: SoundEngine
   ): void {
-    if (this.fireCooldown > 0) return;
+    if (this.hp <= 0 || this.fireCooldown > 0) return;
 
     const dx = targetX - this.x;
     const dy = targetY - this.y;

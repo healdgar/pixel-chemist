@@ -3,6 +3,7 @@ import { WorldGrid } from '../simulation/world';
 import { SoundEngine } from '../audio/soundEngine';
 import type { Player } from './player';
 import type { EnemyUnit } from '../ai/jevDirector';
+import type { BibbiState } from '../world/levelGenerator';
 
 export interface ToolDef {
   id: number;
@@ -147,7 +148,8 @@ export function updateProjectiles(
   world: WorldGrid,
   sound: SoundEngine,
   player?: Player,
-  enemyUnits?: EnemyUnit[]
+  enemyUnits?: EnemyUnit[],
+  bibbi?: BibbiState
 ): void {
   for (let i = projectiles.length - 1; i >= 0; i--) {
     const p = projectiles[i];
@@ -183,12 +185,44 @@ export function updateProjectiles(
             Math.abs(p.y - u.y) <= u.height * 0.65
           ) {
             handleDirectEnemyHit(p, u, gx, gy, world, sound);
-            this_handleProjectileImpact(p, gx, gy, world, sound);
+            this_handleProjectileImpact(p, gx, gy, world, sound, bibbi);
             hit = true;
             break;
           }
         }
         if (hit) break;
+      }
+
+      // 1b. Check direct impact on Bibbi when she is uncarried (delicate: player's own weapons can harm her!)
+      if (bibbi && !bibbi.carried && !bibbi.rescued && bibbi.hp > 0) {
+        if (Math.abs(p.x - bibbi.x) <= 6.5 && Math.abs(p.y - bibbi.y) <= 8.5) {
+          const isSafeBeam =
+            p.type === 'time_accel' ||
+            p.type === 'time_stasis' ||
+            p.type === 'quantum_tunnel' ||
+            (p.type === 'chemical' &&
+              (p.element === ElementId.WATER ||
+                p.element === ElementId.HEAVY_WATER ||
+                p.element === ElementId.ALKALI ||
+                p.element === ElementId.BIO_GEL));
+          if (!isSafeBeam) {
+            const dmg =
+              p.type === 'implosion' || p.type === 'strong_unbind'
+                ? 45
+                : p.type === 'kinetic' || p.type === 'heat' || p.type === 'weak_force' || p.type === 'neutron'
+                ? 26
+                : 16;
+            bibbi.hp = Math.max(0, bibbi.hp - dmg);
+            bibbi.inDanger = true;
+            bibbi.hurtReason = p.fromPlayer
+              ? 'Struck directly by your own weapon!'
+              : 'Hit by J.E.V. crossfire!';
+            sound.playCombatHit(true, false);
+            this_handleProjectileImpact(p, gx, gy, world, sound, bibbi);
+            hit = true;
+            break;
+          }
+        }
       }
 
       // 2. Check direct impact on Player (Quantum Tunneling phases safely through enemy fire!)
@@ -207,8 +241,14 @@ export function updateProjectiles(
           } else {
             player.hp = Math.max(0, player.hp - 5.5);
           }
+          // If Bibbi is riding on the player's back, enemy hits also hurt delicate Bibbi!
+          if (bibbi && bibbi.carried && !bibbi.rescued && bibbi.hp > 0) {
+            bibbi.hp = Math.max(0, bibbi.hp - 9.5);
+            bibbi.inDanger = true;
+            bibbi.hurtReason = 'Hit by enemy fire while riding on your back!';
+          }
           sound.playCombatHit(true, false);
-          this_handleProjectileImpact(p, gx, gy, world, sound);
+          this_handleProjectileImpact(p, gx, gy, world, sound, bibbi);
           hit = true;
           break;
         }
@@ -225,16 +265,16 @@ export function updateProjectiles(
           break;
         }
         if (state === 'liquid') {
-          p.vx *= 0.985;
-          p.vy *= 0.985;
+          p.vx *= 0.992;
+          p.vy *= 0.992;
         }
         continue;
       }
 
       // Projectiles travel through liquids with hydrodynamic drag instead of stopping at the barrel!
       if (state === 'liquid') {
-        p.vx *= 0.978;
-        p.vy *= 0.978;
+        p.vx *= 0.992;
+        p.vy *= 0.992;
 
         // Thermal beams gently heat or chill liquid along their trajectory
         if (p.type === 'heat' || p.type === 'cryo') {
@@ -250,8 +290,8 @@ export function updateProjectiles(
           (el === ElementId.WATER || el === ElementId.HEAVY_WATER || el === ElementId.SALT_WATER) &&
           p.ttl < 78;
 
-        if (speed < 1.35 || p.ttl <= 2 || sodiumWaterReaction) {
-          this_handleProjectileImpact(p, gx, gy, world, sound);
+        if (speed < 0.75 || p.ttl <= 2 || sodiumWaterReaction) {
+          this_handleProjectileImpact(p, gx, gy, world, sound, bibbi);
           hit = true;
           break;
         }
@@ -260,7 +300,7 @@ export function updateProjectiles(
 
       // Solids and powders stop projectiles and trigger full alchemical impact
       if (state === 'solid' || state === 'powder') {
-        this_handleProjectileImpact(p, gx, gy, world, sound);
+        this_handleProjectileImpact(p, gx, gy, world, sound, bibbi);
         hit = true;
         break;
       }
@@ -352,8 +392,37 @@ function this_handleProjectileImpact(
   gx: number,
   gy: number,
   world: WorldGrid,
-  sound: SoundEngine
+  sound: SoundEngine,
+  bibbi?: BibbiState
 ): void {
+  // Check if an explosive/thermal blast impacts dangerously close to delicate Bibbi!
+  if (bibbi && !bibbi.rescued && bibbi.hp > 0) {
+    const distToBibbi = Math.hypot(gx - bibbi.x, gy - bibbi.y);
+    if (distToBibbi < 9.5) {
+      if (p.type === 'implosion') {
+        bibbi.hp = Math.max(0, bibbi.hp - 42);
+        bibbi.inDanger = true;
+        bibbi.hurtReason = 'Crushed by your Hyper-Implosion blast!';
+      } else if (p.type === 'kinetic') {
+        bibbi.hp = Math.max(0, bibbi.hp - 18);
+        bibbi.inDanger = true;
+        bibbi.hurtReason = 'Blasted by your Pressure Cannon shockwave!';
+      } else if (p.type === 'heat') {
+        bibbi.hp = Math.max(0, bibbi.hp - 14);
+        bibbi.inDanger = true;
+        bibbi.hurtReason = 'Scorched by your Thermal Lance!';
+      } else if (p.type === 'cryo') {
+        bibbi.hp = Math.max(0, bibbi.hp - 10);
+        bibbi.inDanger = true;
+        bibbi.hurtReason = 'Frozen by your Cryo-Jet!';
+      } else if (p.type === 'strong_unbind') {
+        bibbi.hp = Math.max(0, bibbi.hp - 28);
+        bibbi.inDanger = true;
+        bibbi.hurtReason = 'Exposed to your Gluon Unbinder!';
+      }
+    }
+  }
+
   switch (p.type) {
     case 'kinetic':
       world.applyPressureImpulse(gx, gy, p.radius, 185, sound);

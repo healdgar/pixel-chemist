@@ -363,11 +363,12 @@ export class WorldRenderer {
     // 4b. Render J.E.V. Mobile Units (Hazmat Guards, Hunter-Seeker Drones, Heavy Combat Mechs)
     this.renderEnemyUnits(mainCtx, level, player, mouseWorld, baseCamX, baseCamY, scaleX, scaleY, tick);
 
-    // 5. Render Bibbi in her Deep Quantum Containment Chamber!
+    // 5. Render Waiting Escape Vehicle & Bibbi
+    this.renderEscapeVehicle(mainCtx, level, baseCamX, baseCamY, scaleX, scaleY, tick);
     this.renderBibbi(mainCtx, level, baseCamX, baseCamY, scaleX, scaleY, tick);
 
-    // 6. Render Dr. Vance (Player) in crisp pixel art
-    this.renderPlayer(mainCtx, player, mouseWorld, baseCamX, baseCamY, scaleX, scaleY, tick);
+    // 6. Render Dr. Vance (Player) in crisp pixel art (plus Bibbi piggybacking if carried!)
+    this.renderPlayer(mainCtx, player, level, mouseWorld, baseCamX, baseCamY, scaleX, scaleY, tick);
 
     // 7. Render Active Projectiles & Beams
     this.renderProjectiles(mainCtx, projectiles, baseCamX, baseCamY, scaleX, scaleY);
@@ -377,7 +378,7 @@ export class WorldRenderer {
       world.reactionEvents.length = 0;
     }
 
-    // 9. Render Clean Reticle (only show chemical formula badge when Thermal/Scanner mode is active)
+    // 9. Render Clean Reticle
     this.renderCursorReticle(
       mainCtx,
       world,
@@ -390,7 +391,7 @@ export class WorldRenderer {
       thermalVision
     );
 
-    // 10. Render Subtle Edge Indicator toward Bibbi
+    // 10. Render Subtle Edge Indicator toward Bibbi or Escape Vehicle
     this.renderBibbiCompass(mainCtx, mainCanvas, player, level);
   }
 
@@ -707,6 +708,89 @@ export class WorldRenderer {
     }
   }
 
+  private renderEscapeVehicle(
+    ctx: CanvasRenderingContext2D,
+    level: LevelData,
+    camX: number,
+    camY: number,
+    sx: number,
+    sy: number,
+    tick: number
+  ): void {
+    const ev = level.escapeVehicle;
+    if (!ev) return;
+    const vx = ev.x - camX;
+    const vy = ev.y - camY;
+    if (vx < -60 || vx > this.viewW + 60 || vy < -60 || vy > this.viewH + 60) return;
+
+    const ex = sx * 2;
+    const ey = sy * 2;
+    const hover = Math.sin(tick * 0.09) * 1.4;
+    const px = vx * sx;
+    const py = (vy + hover) * sy;
+    const ready = level.bibbi.carried;
+
+    ctx.save();
+
+    // Extraction Beacon Aura
+    const grad = ctx.createRadialGradient(px, py, 3, px, py, 16 * ex);
+    grad.addColorStop(0, ready ? 'rgba(6, 214, 160, 0.5)' : 'rgba(76, 201, 240, 0.25)');
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(px, py, 16 * ex, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Landing struts
+    ctx.fillStyle = '#495057';
+    ctx.fillRect(px - 7 * ex, py + 4.5 * ey, 14 * ex, 1.2 * ey);
+    ctx.fillRect(px - 5 * ex, py + 2.5 * ey, 1.4 * ex, 2.5 * ey);
+    ctx.fillRect(px + 3.6 * ex, py + 2.5 * ey, 1.4 * ex, 2.5 * ey);
+
+    // Vehicle Hull & Cockpit by type
+    if (ev.type === 'submersible') {
+      // Deep-sea bathysphere hull
+      ctx.fillStyle = '#ffd166';
+      ctx.fillRect(px - 7.5 * ex, py - 3.5 * ey, 15 * ex, 6.5 * ey);
+      ctx.fillStyle = '#00f5d4';
+      ctx.fillRect(px - 3 * ex, py - 2.2 * ey, 6 * ex, 3.8 * ey);
+    } else if (ev.type === 'drillpod') {
+      // Subterranean extraction pod
+      ctx.fillStyle = '#ff9f1c';
+      ctx.fillRect(px - 7 * ex, py - 3.5 * ey, 14 * ex, 6.5 * ey);
+      ctx.fillStyle = '#adb5bd';
+      ctx.fillRect(px - 9.5 * ex, py - 2 * ey, 2.5 * ex, 3.5 * ey);
+      ctx.fillStyle = '#06d6a0';
+      ctx.fillRect(px - 2.5 * ex, py - 2 * ey, 5.5 * ex, 3.2 * ey);
+    } else {
+      // VTOL Dropship / Chopper / Shuttle / Sky-Skiff
+      ctx.fillStyle = '#343a40';
+      ctx.fillRect(px - 8.5 * ex, py - 3.2 * ey, 17 * ex, 6.0 * ey);
+      ctx.fillStyle = ready ? '#06d6a0' : '#4cc9f0';
+      ctx.fillRect(px - 4.5 * ex, py - 2.2 * ey, 9 * ex, 3.4 * ey);
+
+      // Spinning VTOL Rotors / Thruster Pods
+      const rotorW = (tick & 1) === 0 ? 11 : 6;
+      ctx.fillStyle = '#adb5bd';
+      ctx.fillRect(px - rotorW * ex, py - 4.8 * ey, rotorW * 2 * ex, 0.9 * ey);
+      ctx.fillRect(px - 0.8 * ex, py - 4.5 * ey, 1.6 * ex, 1.5 * ey);
+
+      // Thruster afterburner glow when Bibbi is on board/ready
+      if (ready || (tick & 3) < 2) {
+        ctx.fillStyle = ready ? '#06d6a0' : '#4cc9f0';
+        ctx.fillRect(px - 6 * ex, py + 2.8 * ey, 2.2 * ex, 1.8 * ey);
+        ctx.fillRect(px + 3.8 * ex, py + 2.8 * ey, 2.2 * ex, 1.8 * ey);
+      }
+    }
+
+    // Label above vehicle
+    ctx.font = 'bold 10px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = ready ? '#06d6a0' : '#4cc9f0';
+    ctx.fillText(ready ? `🚁 EXTRACT HERE!` : `🚁 ${ev.name.toUpperCase()}`, px, py - 14);
+    ctx.restore();
+  }
+
   private renderBibbi(
     ctx: CanvasRenderingContext2D,
     level: LevelData,
@@ -717,6 +801,9 @@ export class WorldRenderer {
     tick: number
   ): void {
     const b = level.bibbi;
+    // When carried on Dr. Vance's back (and not yet extracted), renderPlayer draws her piggybacking
+    if (b.carried && !b.rescued) return;
+
     const vx = b.x - camX;
     const vy = b.y - camY;
     if (vx < -40 || vx > this.viewW + 40 || vy < -40 || vy > this.viewH + 40) return;
@@ -750,18 +837,28 @@ export class WorldRenderer {
     ctx.fillRect(px - 1.6 * ex, py + 3.2 * ey, 1.2 * ex, 1.4 * ey);
     ctx.fillRect(px + 0.4 * ex, py + 3.2 * ey, 1.2 * ex, 1.4 * ey);
 
+    // Delicate HP bar if Bibbi has taken damage
+    if (b.hp < b.maxHp && b.hp > 0) {
+      const barW = 6 * ex;
+      ctx.fillStyle = 'rgba(10, 14, 24, 0.85)';
+      ctx.fillRect(px - barW / 2, py - 5.2 * ey, barW, 1.0 * ey);
+      ctx.fillStyle = b.hp < 35 ? '#ff0055' : '#ff99c8';
+      ctx.fillRect(px - barW / 2, py - 5.2 * ey, barW * Math.max(0, b.hp / b.maxHp), 1.0 * ey);
+    }
+
     // Subtle compact tag above Bibbi
     ctx.save();
     ctx.font = 'bold 10px "JetBrains Mono", monospace';
     ctx.textAlign = 'center';
     ctx.fillStyle = b.rescued ? '#ffd166' : '#ff99c8';
-    ctx.fillText(b.rescued ? '♥ RESCUED!' : '♥ BIBBI', px, py - 18);
+    ctx.fillText(b.rescued ? '♥ EXTRACTED!' : '♥ BIBBI', px, py - 18);
     ctx.restore();
   }
 
   private renderPlayer(
     ctx: CanvasRenderingContext2D,
     player: Player,
+    level: LevelData,
     mouseWorld: { wx: number; wy: number },
     camX: number,
     camY: number,
@@ -790,6 +887,31 @@ export class WorldRenderer {
     // Alchemist Backpack Tank
     ctx.fillStyle = '#4cc9f0';
     ctx.fillRect(px - f * 2.6 * ex, py - 2 * ey, 1.4 * ex, 4 * ey);
+
+    // If Bibbi is riding piggyback on Dr. Vance's back!
+    const b = level.bibbi;
+    if (b.carried && !b.rescued) {
+      const bx = px - f * 3.1 * ex;
+      const by = py - 2.3 * ey + Math.sin(tick * 0.25) * 0.4 * ey;
+      // Bibbi's orange pigtails & head peeking over shoulder
+      ctx.fillStyle = '#ff9f1c';
+      ctx.fillRect(bx - 1.8 * ex, by - 3.0 * ey, 3.6 * ex, 1.5 * ey);
+      ctx.fillStyle = '#ffe5d9';
+      ctx.fillRect(bx - 1.2 * ex, by - 2.0 * ey, 2.4 * ex, 2.0 * ey);
+      // Bibbi's magenta jacket & arms hugging Dr. Vance's neck
+      ctx.fillStyle = '#f72585';
+      ctx.fillRect(bx - 1.5 * ex, by, 3.0 * ex, 2.8 * ey);
+      ctx.fillRect(bx, by - 0.6 * ey, f * 2.4 * ex, 1.0 * ey);
+
+      // Delicate Bibbi HP Bar above her head when hurt or carried
+      if (b.hp < b.maxHp) {
+        const barW = 6.5 * ex;
+        ctx.fillStyle = 'rgba(10, 14, 24, 0.9)';
+        ctx.fillRect(px - barW / 2, py - 7.0 * ey, barW, 1.1 * ey);
+        ctx.fillStyle = b.hp < 35 ? '#ff0055' : '#ff99c8';
+        ctx.fillRect(px - barW / 2, py - 7.0 * ey, barW * Math.max(0, b.hp / b.maxHp), 1.1 * ey);
+      }
+    }
 
     // Hazmat Suit Body
     ctx.fillStyle = '#ffd166';
@@ -915,23 +1037,25 @@ export class WorldRenderer {
     level: LevelData
   ): void {
     const b = level.bibbi;
-    const dx = b.x - player.x;
-    const dy = b.y - player.y;
+    const targetX = b.carried ? level.escapeVehicle.x : b.x;
+    const targetY = b.carried ? level.escapeVehicle.y : b.y;
+    const dx = targetX - player.x;
+    const dy = targetY - player.y;
     const dist = Math.round(Math.hypot(dx, dy));
-    if (dist < 110) return;
+    if (dist < 100) return;
 
     const angle = Math.atan2(dy, dx);
-    const cx = canvas.width / 2 + Math.cos(angle) * (canvas.width / 2 - 28);
-    const cy = canvas.height / 2 + Math.sin(angle) * (canvas.height / 2 - 28);
+    const cx = canvas.width / 2 + Math.cos(angle) * (canvas.width / 2 - 34);
+    const cy = canvas.height / 2 + Math.sin(angle) * (canvas.height / 2 - 34);
 
     ctx.save();
     ctx.font = 'bold 10px "JetBrains Mono", monospace';
     ctx.textAlign = 'center';
-    const text = `♥ ${Math.round(dist / 2)}m`;
+    const text = b.carried ? `🚁 EXIT ${Math.round(dist / 2)}m` : `♥ ${Math.round(dist / 2)}m`;
     const w = ctx.measureText(text).width + 10;
-    ctx.fillStyle = 'rgba(28, 12, 42, 0.78)';
+    ctx.fillStyle = b.carried ? 'rgba(6, 42, 32, 0.85)' : 'rgba(28, 12, 42, 0.78)';
     ctx.fillRect(cx - w / 2, cy - 9, w, 15);
-    ctx.fillStyle = '#ff99c8';
+    ctx.fillStyle = b.carried ? '#06d6a0' : '#ff99c8';
     ctx.fillText(text, cx, cy + 2);
     ctx.restore();
   }
@@ -1000,11 +1124,21 @@ export class WorldRenderer {
       }
     }
 
+    // Escape Vehicle marker on minimap (bright emerald)
+    if (level.escapeVehicle) {
+      tctx.fillStyle = '#06d6a0';
+      tctx.beginPath();
+      tctx.arc(level.escapeVehicle.x * sx, level.escapeVehicle.y * sy, 4, 0, Math.PI * 2);
+      tctx.fill();
+    }
+
     // Bibbi pulsing beacon on minimap
-    tctx.fillStyle = '#f72585';
-    tctx.beginPath();
-    tctx.arc(level.bibbi.x * sx, level.bibbi.y * sy, 4, 0, Math.PI * 2);
-    tctx.fill();
+    if (!level.bibbi.carried) {
+      tctx.fillStyle = '#f72585';
+      tctx.beginPath();
+      tctx.arc(level.bibbi.x * sx, level.bibbi.y * sy, 4, 0, Math.PI * 2);
+      tctx.fill();
+    }
 
     // Player dot on minimap
     tctx.fillStyle = '#ffd166';

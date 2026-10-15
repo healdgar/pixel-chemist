@@ -1,12 +1,13 @@
 import './style.css';
 import { ElementId } from './chemistry/elements';
 import { WorldGrid, WorldSnapshot } from './simulation/world';
+import { FixedStepClock } from './simulation/fixedStepClock';
 import { generateLevel, MAP_CATALOG, MapId, LevelData } from './world/levelGenerator';
 import { Player } from './entities/player';
 import { TOOLS, Projectile, updateProjectiles } from './entities/tools';
 import { WorldRenderer } from './render/renderer';
 import { SoundEngine } from './audio/soundEngine';
-import { GamepadManager } from './input/gamepadManager';
+import { GamepadManager, GamepadState } from './input/gamepadManager';
 import { TouchControlsManager } from './input/touchControls';
 import {
   JevDirector,
@@ -79,13 +80,47 @@ renderer.camX = Math.max(0, Math.min(WORLD_W - renderer.viewW, player.x - render
 renderer.camY = Math.max(0, Math.min(WORLD_H - renderer.viewH, player.y - renderer.viewH / 2));
 const projectiles: Projectile[] = [];
 
-// Circular buffer of 5-second World Snapshots for Chroniton Time Rewind [R]
-const snapshots: WorldSnapshot[] = [];
+interface GameSnapshot {
+  tick: number;
+  world: WorldSnapshot;
+  player: ReturnType<Player['createSnapshot']>;
+  director: ReturnType<JevDirector['createSnapshot']>;
+  enemyUnits: NonNullable<LevelData['enemyUnits']>;
+  defenses: NonNullable<LevelData['defenses']>;
+  turrets: LevelData['turrets'];
+  bibbi: LevelData['bibbi'];
+  projectiles: Projectile[];
+  camX: number;
+  camY: number;
+  fusionAlertShown: boolean;
+}
+
+let tick = 0;
+let fusionAlertShown = false;
+let breachAlertShown = false;
+let bibbiDeathAlertShown = false;
+
+// One-second checkpoints retain enough history for a roughly five-second rewind.
+const snapshots: GameSnapshot[] = [];
 const MAX_SNAPSHOTS = 6;
+const SNAPSHOT_INTERVAL_TICKS = 60;
+const REWIND_TICKS = 300;
 
 function saveSnapshot(): void {
-  if (player.hp <= 0) return;
-  snapshots.push(world.createSnapshot(player.x, player.y, player.hp));
+  if (player.hp <= 0 || level.bibbi.hp <= 0) return;
+  snapshots.push({
+    tick,
+    world: world.createSnapshot(player.x, player.y, player.hp),
+    player: player.createSnapshot(),
+    director: jevDirector.createSnapshot(),
+    enemyUnits: (level.enemyUnits ?? []).map((unit) => ({ ...unit })),
+    defenses: (level.defenses ?? []).map((defense) => ({ ...defense })),
+    turrets: level.turrets.map((turret) => ({ ...turret })),
+    bibbi: { ...level.bibbi },
+    projectiles: projectiles.map((projectile) => ({ ...projectile })),
+    camX: renderer.camX, camY: renderer.camY,
+    fusionAlertShown,
+  });
   if (snapshots.length > MAX_SNAPSHOTS) {
     snapshots.shift();
   }
@@ -94,15 +129,33 @@ saveSnapshot();
 
 function rewindTime(): void {
   if (snapshots.length === 0) return;
-  const snap = snapshots.length > 1 ? snapshots.shift()! : snapshots[0];
-  world.restoreSnapshot(snap);
-  player.x = snap.playerX;
-  player.y = snap.playerY;
-  player.hp = Math.max(60, snap.playerHp);
-  player.oxygen = Math.max(40, player.oxygen);
-  player.vx = 0;
-  player.vy = 0;
-  projectiles.length = 0;
+  const targetTick = tick - REWIND_TICKS;
+  let index = 0;
+  for (let i = 0; i < snapshots.length; i++) {
+    if (snapshots[i].tick <= targetTick) index = i;
+  }
+  const snap = snapshots[index];
+  snapshots.splice(index + 1); // Abandon the future; repeated rewinds cannot move forward.
+  world.restoreSnapshot(snap.world);
+  player.restoreSnapshot(snap.player);
+  jevDirector.restoreSnapshot(snap.director);
+  level.enemyUnits = snap.enemyUnits.map((unit) => ({ ...unit }));
+  level.defenses = snap.defenses.map((defense) => ({ ...defense }));
+  level.turrets = snap.turrets.map((turret) => ({ ...turret }));
+  level.bibbi = { ...snap.bibbi };
+  player.carryingBibbi = level.bibbi.carried;
+  projectiles.splice(0, projectiles.length, ...snap.projectiles.map((projectile) => ({ ...projectile })));
+  renderer.camX = snap.camX;
+  renderer.camY = snap.camY;
+  tick = snap.tick;
+  fusionAlertShown = snap.fusionAlertShown;
+  breachAlertShown = false;
+  bibbiDeathAlertShown = false;
+  document.querySelectorAll<HTMLDialogElement>('dialog[open]').forEach((dialog) => dialog.close());
+  simulationClock.reset();
+  selectTool(player.selectedTool, false);
+  updateHud();
+  renderer.renderMinimap(minimapCanvas, world, player, level);
   sound.playQuantumBeam(520);
   gamepad.triggerRumble(180, 0.5, 0.7);
   world.addReactionPopup(Math.floor(player.x), Math.floor(player.y) - 6, '⏪ TIME REWOUND!', '#00f5d4');
@@ -113,32 +166,26 @@ function loadMap(mapId: MapId): void {
   if (mapSelectEl) mapSelectEl.value = mapId;
   projectiles.length = 0;
   snapshots.length = 0;
+  tick = 0;
+  simulationClock.reset();
   world.fusionTriggered = false;
   fusionAlertShown = false;
+  breachAlertShown = false;
+  bibbiDeathAlertShown = false;
 
   level = generateLevel(world, mapId);
   jevDirector.resetForLevel(level.mapInfo.shortName);
-  player.x = level.spawnX;
-  player.y = level.spawnY;
-  player.vx = 0;
-  player.vy = 0;
-  player.hp = 100;
-  player.oxygen = 100;
-  player.radiationDose = 0;
-  player.gravityScale = level.mapInfo.gravityScale;
+  player.reset(level.spawnX, level.spawnY, level.mapInfo.gravityScale);
 
   renderer.camX = Math.max(0, Math.min(WORLD_W - renderer.viewW, player.x - renderer.viewW / 2));
   renderer.camY = Math.max(0, Math.min(WORLD_H - renderer.viewH, player.y - renderer.viewH / 2));
 
-  const pill = document.getElementById('bibbi-status-pill')!;
-  pill.textContent = 'BIBBI: IN STASIS';
-  pill.style.background = 'rgba(247, 37, 133, 0.2)';
-  pill.style.borderColor = 'rgba(247, 37, 133, 0.5)';
-  pill.style.color = '#ff99c8';
   minimapTitleEl.textContent = level.mapInfo.shortName.toUpperCase();
 
   renderMapCards();
   saveSnapshot();
+  updateHud();
+  renderer.renderMinimap(minimapCanvas, world, player, level);
   sound.playQuantumBeam(580);
   world.addReactionPopup(
     Math.floor(player.x),
@@ -243,7 +290,6 @@ let mouseScreenY = window.innerHeight / 2;
 let mouseLeftDown = false;
 let mouseRightDown = false;
 let thermalVision = false;
-let fusionAlertShown = false;
 
 // Controller Right-Thumbstick Reticle State (offset relative to player so reticle travels with character)
 let usingGamepadAim = false;
@@ -251,6 +297,14 @@ let reticleOffsetX = 24;
 let reticleOffsetY = 0;
 
 window.addEventListener('keydown', (e) => {
+  if (e.code === 'Escape' || e.code === 'KeyM') {
+    e.preventDefault();
+    if (e.repeat) return;
+    const openDialog = document.querySelector<HTMLDialogElement>('dialog[open]');
+    if (openDialog) openDialog.close();
+    else menuDialog?.showModal();
+    return;
+  }
   keys.add(e.code);
 
   if (e.code.startsWith('Digit')) {
@@ -267,17 +321,13 @@ window.addEventListener('keydown', (e) => {
       '#c77dff'
     );
   } else if (e.code === 'KeyR') {
-    rewindTime();
+    if (!e.repeat) rewindTime();
   } else if (e.code === 'KeyV') {
     thermalVision = !thermalVision;
   } else if (e.code === 'KeyC') {
     const dlg = document.getElementById('codex-dialog') as HTMLDialogElement;
     if (dlg.open) dlg.close();
     else dlg.showModal();
-  } else if (e.code === 'KeyM') {
-    sound.muted = !sound.muted;
-    const muteBtn = document.getElementById('btn-mute')!;
-    muteBtn.textContent = sound.muted ? '🔇 Muted' : '🔊 SFX';
   } else if (e.code === 'KeyE') {
     tryOpenNearbyTerminal();
   } else if (e.code === 'KeyL') {
@@ -476,8 +526,6 @@ document.getElementById('btn-event-next-map')?.addEventListener('click', () => {
   loadNextMap();
 });
 document.getElementById('btn-event-rewind')?.addEventListener('click', () => {
-  (document.getElementById('event-dialog') as HTMLDialogElement).close();
-  fusionAlertShown = false;
   rewindTime();
 });
 document.getElementById('btn-event-reset')?.addEventListener('click', () => {
@@ -560,34 +608,111 @@ function updateTurretsAndBibbi(): void {
     }
   }
 
-  // Check Bibbi's Stasis Cage & Rescue!
+  // Check Bibbi's Stasis Cage, Delicate Health, Piggyback Pickup & Vehicle Extraction!
+  if (player.hp <= 0 || level.bibbi.hp <= 0) return;
+
+  player.carryingBibbi = level.bibbi.carried;
+
   if (!level.bibbi.rescued) {
-    let crystalCount = 0;
-    const bx = level.bibbi.x;
-    const by = level.bibbi.y;
-    for (let dy = -32; dy <= 32; dy += 2) {
-      for (let dx = -32; dx <= 32; dx += 2) {
-        if (world.getElement(bx + dx, by + dy) === ElementId.CHRONITON_CRYSTAL) {
-          crystalCount++;
+    // When carried on Dr. Vance's back, keep Bibbi's world coordinates synced to his shoulders
+    if (level.bibbi.carried) {
+      level.bibbi.x = Math.round(player.x - player.facing * 4);
+      level.bibbi.y = Math.round(player.y - 3);
+    }
+
+    const bx = Math.floor(level.bibbi.x);
+    const by = Math.floor(level.bibbi.y);
+
+    // Sample environmental hazards around delicate Bibbi (she does NOT have heavy hazmat shielding!)
+    if (world.inBounds(bx, by)) {
+      const bi = world.idx(bx, by);
+      const bEl = world.grid[bi] as ElementId;
+      const bTemp = world.temp[bi];
+      const bPress = world.pressure[bi];
+      const bRad = world.radiation[bi];
+
+      if (bTemp > 110) {
+        level.bibbi.hp -= (bTemp - 110) * 0.008;
+        level.bibbi.hurtReason = 'extreme thermal burns';
+      } else if (bTemp < (level.bibbi.carried ? -65 : -110)) {
+        level.bibbi.hp -= Math.abs(bTemp + 65) * 0.005;
+        level.bibbi.hurtReason = 'cryogenic frostbite';
+      }
+
+      if (
+        bEl === ElementId.ACID ||
+        bEl === ElementId.TOXIC_GAS ||
+        bEl === ElementId.PLASMA ||
+        bEl === ElementId.QUARK_PLASMA ||
+        bEl === ElementId.THERMITE ||
+        bEl === ElementId.LAVA ||
+        bEl === ElementId.FIRE
+      ) {
+        level.bibbi.hp -= 1.15;
+        level.bibbi.hurtReason = 'caustic / alchemical exposure';
+      }
+
+      if (bPress > 35) {
+        level.bibbi.hp -= (bPress - 35) * 0.14;
+        level.bibbi.hurtReason = 'barotrauma blast wave';
+      }
+
+      if (bRad > 1.2) {
+        level.bibbi.hp -= (bRad - 1.2) * 0.25;
+        level.bibbi.hurtReason = 'acute radiation exposure';
+      }
+
+      if (level.bibbi.carried && player.oxygen <= 0) {
+        level.bibbi.hp -= 0.45;
+        level.bibbi.hurtReason = 'underwater hypoxia';
+      }
+
+      if (bEl === ElementId.BIO_GEL) {
+        level.bibbi.hp = Math.min(level.bibbi.maxHp, level.bibbi.hp + 0.55);
+      }
+
+      level.bibbi.hp = Math.max(0, level.bibbi.hp);
+    }
+
+    if (!level.bibbi.carried && level.bibbi.hp > 0) {
+      let crystalCount = 0;
+      for (let dy = -32; dy <= 32; dy += 2) {
+        for (let dx = -32; dx <= 32; dx += 2) {
+          if (world.getElement(bx + dx, by + dy) === ElementId.CHRONITON_CRYSTAL) {
+            crystalCount++;
+          }
         }
       }
-    }
-    level.bibbi.cageIntactCount = crystalCount;
+      level.bibbi.cageIntactCount = crystalCount;
 
-    const distToBibbi = Math.hypot(player.x - bx, player.y - by);
-    if (distToBibbi < 26 || (crystalCount < 25 && distToBibbi < 44)) {
-      level.bibbi.rescued = true;
-      sound.playVictory();
-      const pill = document.getElementById('bibbi-status-pill')!;
-      pill.textContent = '♥ BIBBI RESCUED!';
-      pill.style.background = 'rgba(6, 214, 160, 0.25)';
-      pill.style.borderColor = '#06d6a0';
-      pill.style.color = '#06d6a0';
-
-      showEventModal(
-        '🎉 VICTORY: YOU RESCUED BIBBI!',
-        'You dissolved the Chroniton Stasis Lattice, outsmarted the J.E.V. Neural Defense Director, and saved your daughter Bibbi! Click "Next World Map [N]" to infiltrate the next environment!'
-      );
+      const distToBibbi = Math.hypot(player.x - bx, player.y - by);
+      if (distToBibbi < 24 || (crystalCount < 25 && distToBibbi < 40)) {
+        level.bibbi.carried = true;
+        player.carryingBibbi = true;
+        sound.playQuantumBeam(880);
+        gamepad.triggerRumble(140, 0.35, 0.55);
+        jevDirector.reportIncident(
+          35,
+          `ALERT: Intruder has Bibbi on his back! Intercept before he reaches the ${level.escapeVehicle.name}!`
+        );
+        updateBibbiStatus();
+      }
+    } else if (level.bibbi.carried && level.bibbi.hp > 0) {
+      const ev = level.escapeVehicle;
+      const distToEv = Math.hypot(player.x - ev.x, player.y - ev.y);
+      if (distToEv < 30) {
+        level.bibbi.rescued = true;
+        player.carryingBibbi = false;
+        level.bibbi.x = ev.x;
+        level.bibbi.y = ev.y - 6;
+        sound.playVictory();
+        gamepad.triggerRumble(320, 0.6, 0.85);
+        updateBibbiStatus();
+        showEventModal(
+          `🎉 EXTRACTION COMPLETE: ESCAPED IN ${ev.name.toUpperCase()}!`,
+          `You carried Bibbi safely across the facility (${Math.ceil(level.bibbi.hp)}% health remaining) and boarded the waiting ${ev.name}! Click "Next World Map [N]" to infiltrate the next environment!`
+        );
+      }
     }
   }
 }
@@ -685,7 +810,35 @@ function renderJevTelemetryModal(): void {
   `;
 }
 
+function updateBibbiStatus(): void {
+  const bibbiPill = document.getElementById('bibbi-status-pill')!;
+  const b = level.bibbi;
+  const hpPct = Math.max(0, Math.min(100, Math.ceil(b.hp)));
+  if (b.rescued) {
+    bibbiPill.textContent = '♥ BIBBI EXTRACTED!';
+    bibbiPill.style.background = 'rgba(6, 214, 160, 0.25)';
+    bibbiPill.style.borderColor = '#06d6a0';
+    bibbiPill.style.color = '#06d6a0';
+  } else if (b.hp <= 0) {
+    bibbiPill.textContent = '💔 BIBBI LOST!';
+    bibbiPill.style.background = 'rgba(255, 0, 85, 0.28)';
+    bibbiPill.style.borderColor = '#ff0055';
+    bibbiPill.style.color = '#ff4d6d';
+  } else if (b.carried) {
+    bibbiPill.textContent = `🎒 ON BACK (${hpPct}%) → EXTRACT!`;
+    bibbiPill.style.background = hpPct < 45 ? 'rgba(255, 0, 85, 0.25)' : 'rgba(6, 214, 160, 0.22)';
+    bibbiPill.style.borderColor = hpPct < 45 ? '#ff0055' : '#06d6a0';
+    bibbiPill.style.color = hpPct < 45 ? '#ff4d6d' : '#06d6a0';
+  } else {
+    bibbiPill.textContent = `♥ BIBBI: ${hpPct}%`;
+    bibbiPill.style.background = hpPct < 100 ? 'rgba(255, 0, 85, 0.22)' : 'rgba(247, 37, 133, 0.2)';
+    bibbiPill.style.borderColor = hpPct < 100 ? '#ff0055' : 'rgba(247, 37, 133, 0.5)';
+    bibbiPill.style.color = hpPct < 100 ? '#ff4d6d' : '#ff99c8';
+  }
+}
+
 function updateHud(): void {
+  updateBibbiStatus();
   const hpPct = Math.max(0, Math.min(100, Math.round(player.hp)));
   hpBar.style.width = `${hpPct}%`;
   hpText.textContent = `${hpPct}`;
@@ -749,9 +902,20 @@ function updateHud(): void {
     );
   }
 
+  // Trigger Bibbi Lost Modal if delicate Bibbi's HP hits 0!
+  if (level.bibbi.hp <= 0 && !bibbiDeathAlertShown) {
+    bibbiDeathAlertShown = true;
+    gamepad.triggerRumble(550, 0.9, 1.0);
+    const cause = level.bibbi.hurtReason || 'alchemical crossfire';
+    showEventModal(
+      '💔 BIBBI PERISHED!',
+      `Bibbi is delicate and succumbed to ${cause}! Watch your fire and shield her from blasts and hazards while escorting her to the ${level.escapeVehicle.name}. Press [Y / R] to activate your Chroniton Time-Rewind device and rewind 5 seconds!`
+    );
+  }
+
   // Trigger Suit Breach Modal if HP hits 0
-  if (player.hp <= 0 && !fusionAlertShown) {
-    fusionAlertShown = true;
+  if (player.hp <= 0 && !breachAlertShown) {
+    breachAlertShown = true;
     gamepad.triggerRumble(450, 0.8, 0.9);
     showEventModal(
       '⚠️ HAZMAT SUIT BREACHED!',
@@ -761,28 +925,22 @@ function updateHud(): void {
 }
 
 // 7. Main 60Hz Game Loop
-let tick = 0;
 let lastFpsTime = performance.now();
 let frames = 0;
+const simulationClock = new FixedStepClock();
 
-function gameLoop(now: number): void {
-  tick++;
-  frames++;
-  if (now - lastFpsTime >= 500) {
-    const fps = Math.round((frames * 1000) / (now - lastFpsTime));
-    fpsCounter.textContent = `${fps} FPS`;
-    frames = 0;
-    lastFpsTime = now;
-  }
+function isSimulationPaused(): boolean {
+  return (
+    player.hp <= 0 ||
+    level.bibbi.hp <= 0 ||
+    document.hidden ||
+    document.querySelector('dialog[open]') !== null
+  );
+}
 
-  // Save a snapshot every 180 ticks (~3 seconds)
-  if (tick % 180 === 0) {
-    saveSnapshot();
-  }
-
+function pollControls(): GamepadState {
   // Poll Gamepad + Virtual Dual-Stick Touch State
   const gp = touchControls.applyToGamepadState(gamepad.poll());
-  const openDialog = document.querySelector<HTMLDialogElement>('dialog[open]');
 
   // Handle Gamepad Edge-Triggered Buttons
   if (gp.connected) {
@@ -816,14 +974,11 @@ function gameLoop(now: number): void {
 
     // Y / Triangle rewinds time (even if Fusion/Breach modal is open!)
     if (gp.rewindPressed) {
-      if (openDialog) {
-        openDialog.close();
-        fusionAlertShown = false;
-      }
       rewindTime();
     }
 
     // If a modal is open, B / Circle or X / Square closes it
+    const openDialog = document.querySelector<HTMLDialogElement>('dialog[open]');
     if (openDialog) {
       if (gp.closeModalPressed || gp.interactPressed) {
         openDialog.close();
@@ -857,63 +1012,66 @@ function gameLoop(now: number): void {
         reticleOffsetX = player.facing * 52;
         reticleOffsetY = 0;
       }
-
-      // Right Thumbstick moves the aiming reticle smoothly!
-      if (Math.abs(gp.aimX) > 0 || Math.abs(gp.aimY) > 0) {
-        if (!usingGamepadAim) {
-          // Initialize offset from current mouse world position when switching to stick
-          const curMouse = renderer.screenToWorld(mouseScreenX, mouseScreenY, mainCanvas);
-          reticleOffsetX = curMouse.wx - player.x;
-          reticleOffsetY = curMouse.wy - player.y;
-          usingGamepadAim = true;
-        }
-        const reticleSpeed = 4.3;
-        reticleOffsetX = Math.max(-210, Math.min(210, reticleOffsetX + gp.aimX * reticleSpeed));
-        reticleOffsetY = Math.max(-128, Math.min(128, reticleOffsetY + gp.aimY * reticleSpeed));
-      }
     }
   }
+  return gp;
+}
 
-  // Compute active reticle position in world coordinates
-  const targetWorld = usingGamepadAim
+function getTargetWorld(): { wx: number; wy: number } {
+  return usingGamepadAim
     ? {
         wx: Math.max(2, Math.min(world.width - 3, player.x + reticleOffsetX)),
         wy: Math.max(2, Math.min(world.height - 3, player.y + reticleOffsetY)),
       }
     : renderer.screenToWorld(mouseScreenX, mouseScreenY, mainCanvas);
+}
 
-  // Continuous tool firing when mouse OR controller triggers held down (if no dialog is open)
-  if (!openDialog) {
-    const firePrimary = mouseLeftDown || (gp.connected && gp.primaryFireHeld);
-    const fireSecondary = mouseRightDown || (gp.connected && gp.secondaryFireHeld);
+function simulateTick(gp: GamepadState): void {
+  tick++;
 
-    if (firePrimary) {
-      const fired = player.fireCooldown === 0;
-      player.fireTool(targetWorld.wx, targetWorld.wy, false, projectiles, world, sound);
-      if (fired && gp.connected && gp.primaryFireHeld && player.selectedTool === 1) {
-        gamepad.triggerRumble(55, 0.25, 0.4);
-      }
-    } else if (fireSecondary) {
-      const fired = player.fireCooldown === 0;
-      player.fireTool(targetWorld.wx, targetWorld.wy, true, projectiles, world, sound);
-      if (fired && gp.connected && gp.secondaryFireHeld && player.selectedTool === 1) {
-        gamepad.triggerRumble(110, 0.5, 0.8);
-      }
+  // Continuous input is integrated in simulation time, including controller aim.
+  if (gp.connected && (Math.abs(gp.aimX) > 0 || Math.abs(gp.aimY) > 0)) {
+    if (!usingGamepadAim) {
+      const curMouse = renderer.screenToWorld(mouseScreenX, mouseScreenY, mainCanvas);
+      reticleOffsetX = curMouse.wx - player.x;
+      reticleOffsetY = curMouse.wy - player.y;
+      usingGamepadAim = true;
     }
-    player.update(keys, world, sound, gp);
-    jevDirector.update(
-      world,
-      player,
-      level.enemyUnits || [],
-      level.defenses || [],
-      projectiles,
-      level.bibbi,
-      sound,
-      tick
-    );
+    reticleOffsetX = Math.max(-210, Math.min(210, reticleOffsetX + gp.aimX * 4.3));
+    reticleOffsetY = Math.max(-128, Math.min(128, reticleOffsetY + gp.aimY * 4.3));
   }
+  const targetWorld = getTargetWorld();
 
-  updateProjectiles(projectiles, world, sound, player, level.enemyUnits);
+  // Continuous tool firing when mouse OR controller triggers are held down.
+  const firePrimary = mouseLeftDown || (gp.connected && gp.primaryFireHeld);
+  const fireSecondary = mouseRightDown || (gp.connected && gp.secondaryFireHeld);
+
+  if (firePrimary) {
+    const fired = player.fireCooldown === 0;
+    player.fireTool(targetWorld.wx, targetWorld.wy, false, projectiles, world, sound);
+    if (fired && gp.connected && gp.primaryFireHeld && player.selectedTool === 1) {
+      gamepad.triggerRumble(55, 0.25, 0.4);
+    }
+  } else if (fireSecondary) {
+    const fired = player.fireCooldown === 0;
+    player.fireTool(targetWorld.wx, targetWorld.wy, true, projectiles, world, sound);
+    if (fired && gp.connected && gp.secondaryFireHeld && player.selectedTool === 1) {
+      gamepad.triggerRumble(110, 0.5, 0.8);
+    }
+  }
+  player.update(keys, world, sound, gp);
+  jevDirector.update(
+    world,
+    player,
+    level.enemyUnits || [],
+    level.defenses || [],
+    projectiles,
+    level.bibbi,
+    sound,
+    tick
+  );
+
+  updateProjectiles(projectiles, world, sound, player, level.enemyUnits, level.bibbi);
   updateTurretsAndBibbi();
 
   // Step atomic pixel simulation around camera
@@ -924,6 +1082,34 @@ function gameLoop(now: number): void {
     sound
   );
 
+  if (tick % SNAPSHOT_INTERVAL_TICKS === 0) saveSnapshot();
+  if (
+    tick % 4 === 0 ||
+    player.hp <= 0 ||
+    level.bibbi.hp <= 0 ||
+    (world.fusionTriggered && !fusionAlertShown)
+  ) {
+    renderer.renderMinimap(minimapCanvas, world, player, level);
+    updateHud();
+  }
+}
+
+function gameLoop(now: number): void {
+  frames++;
+  if (now - lastFpsTime >= 500) {
+    fpsCounter.textContent = `${Math.round((frames * 1000) / (now - lastFpsTime))} FPS`;
+    frames = 0;
+    lastFpsTime = now;
+  }
+
+  // Poll edge-triggered menu actions once per render, including while paused.
+  const gp = pollControls();
+  simulationClock.advance(now, isSimulationPaused(), () => {
+    simulateTick(gp);
+    // A victory, breach, or controller interaction can open a dialog during catch-up.
+    return !isSimulationPaused();
+  });
+
   // Render fat-pixel world + entities
   renderer.render(
     mainCanvas,
@@ -932,18 +1118,21 @@ function gameLoop(now: number): void {
     player,
     projectiles,
     level,
-    targetWorld,
+    getTargetWorld(),
     tick,
     thermalVision
   );
 
-  // Update minimap radar every 4 frames for peak performance
-  if (tick % 4 === 0) {
-    renderer.renderMinimap(minimapCanvas, world, player, level);
-    updateHud();
-  }
-
   requestAnimationFrame(gameLoop);
 }
 
+window.addEventListener('blur', () => {
+  keys.clear();
+  mouseLeftDown = false;
+  mouseRightDown = false;
+});
+document.addEventListener('visibilitychange', () => simulationClock.reset());
+
+updateHud();
+renderer.renderMinimap(minimapCanvas, world, player, level);
 requestAnimationFrame(gameLoop);

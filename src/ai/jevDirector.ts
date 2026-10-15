@@ -205,6 +205,28 @@ export class JevNeuralBrain {
     this.onlineUpdates = 0;
   }
 
+  private snapshotArrays(): Float32Array[] {
+    return [
+      this.w1, this.b1, this.wDir, this.bDir, this.wLoad, this.bLoad, this.wNoul, this.bNoul,
+      this.lastLevers, this.lastHidden, this.lastDirProbs, this.lastLoadProbs, this.lastNoulProbs,
+    ];
+  }
+
+  public createSnapshot() {
+    return {
+      arrays: this.snapshotArrays().map((array) => new Float32Array(array)),
+      trainedEpisodes: this.trainedEpisodes, onlineUpdates: this.onlineUpdates,
+      baselineReward: this.baselineReward, lastLoss: this.lastLoss, lastReward: this.lastReward,
+      lastChosenDirIdx: this.lastChosenDirIdx, lastChosenLoadIdx: this.lastChosenLoadIdx,
+    };
+  }
+
+  public restoreSnapshot(snapshot: ReturnType<JevNeuralBrain['createSnapshot']>): void {
+    this.snapshotArrays().forEach((array, index) => array.set(snapshot.arrays[index]));
+    const { arrays, ...state } = snapshot;
+    Object.assign(this, state);
+  }
+
   /**
    * Forward pass computing:
    * - `choice` distribution over Directives
@@ -338,8 +360,9 @@ export class JevNeuralBrain {
     for (let ep = 0; ep < episodes; ep++) {
       // Sample a random game state across the 12 levers
       for (let i = 0; i < 4; i++) x[i] = 0;
-      const activeToolGroup = ep % 4;
-      x[activeToolGroup] = 0.85 + Math.random() * 0.15;
+      // Include neutral/pressure-tool states so ordinary interception is learnable.
+      const activeToolGroup = ep % 5;
+      if (activeToolGroup < 4) x[activeToolGroup] = 0.85 + Math.random() * 0.15;
       x[4] = Math.random() < 0.2 ? 1.0 : 0.0; // Quantum Phase-Walk
       x[5] = activeToolGroup === 0 ? 0.65 + Math.random() * 0.35 : Math.random() * 0.5; // Temp
       x[6] = Math.random() * 0.6; // Pressure
@@ -557,6 +580,26 @@ export class JevDirector {
   private prevPlayerHp: number = 100;
   private prevDistToBibbi: number = 500;
   private prevActiveUnitCount: number = 0;
+
+  public createSnapshot() {
+    return {
+      brain: this.brain.createSnapshot(),
+      alertLevel: this.alertLevel, alertState: this.alertState,
+      currentDirective: this.currentDirective, currentLoadout: this.currentLoadout,
+      directiveConfidence: this.directiveConfidence, vaultThreatProb: this.vaultThreatProb,
+      counterAlchemyProb: this.counterAlchemyProb, urgencyScore: this.urgencyScore,
+      lastBroadcast: this.lastBroadcast, decisionTickCounter: this.decisionTickCounter,
+      reinforcementCooldown: this.reinforcementCooldown,
+      prevPlayerHp: this.prevPlayerHp, prevDistToBibbi: this.prevDistToBibbi,
+      prevActiveUnitCount: this.prevActiveUnitCount,
+    };
+  }
+
+  public restoreSnapshot(snapshot: ReturnType<JevDirector['createSnapshot']>): void {
+    const { brain, ...state } = snapshot;
+    this.brain.restoreSnapshot(brain);
+    Object.assign(this, state);
+  }
 
   public resetForLevel(mapName: string): void {
     this.alertLevel = 18;
@@ -1057,6 +1100,7 @@ export class JevDirector {
     let radSum = 0;
     let inAcid = false;
     let inWater = false;
+    let inAnyLiquid = false;
     let inLavaOrFire = false;
     let inQuarkOrFusion = false;
     let hasTimeAccel = false;
@@ -1079,6 +1123,9 @@ export class JevDirector {
         if (p > maxPress) maxPress = p;
         radSum += world.radiation[i];
 
+        if (ELEMENTS[el].state === 'liquid') {
+          inAnyLiquid = true;
+        }
         if (el === ElementId.ACID) inAcid = true;
         if (
           el === ElementId.WATER ||
@@ -1105,8 +1152,8 @@ export class JevDirector {
       return false;
     }
 
-    if (inWater) {
-      u.wetTimer = 180;
+    if (inWater || inAnyLiquid) {
+      u.wetTimer = Math.max(u.wetTimer, 120);
     }
 
     if (hasTimeAccel && (u.wetTimer > 0 || inWater)) {
@@ -1144,7 +1191,7 @@ export class JevDirector {
       return false;
     }
 
-    return inAcid || inLavaOrFire || maxTemp > 320;
+    return inAnyLiquid || inAcid || inLavaOrFire || maxTemp > 320;
   }
 
   public killUnit(u: EnemyUnit, world: WorldGrid, sound: SoundEngine): void {
@@ -1234,6 +1281,19 @@ export class JevDirector {
     }
   }
 
+  private hasLiquidPoolAhead(u: EnemyUnit, dir: 1 | -1, world: WorldGrid): boolean {
+    const checkX = Math.floor(u.x + dir * (u.width / 2 + 6));
+    const footY = Math.floor(u.y + u.height / 2);
+    for (let dy = -4; dy <= 16; dy += 2) {
+      if (!world.inBounds(checkX, footY + dy)) continue;
+      const el = world.getElement(checkX, footY + dy);
+      const state = ELEMENTS[el].state;
+      if (state === 'liquid') return true;
+      if (state === 'solid' || state === 'powder') return false;
+    }
+    return false;
+  }
+
   private moveGroundUnit(
     u: EnemyUnit,
     world: WorldGrid,
@@ -1244,18 +1304,35 @@ export class JevDirector {
     const cryoSlowdown = u.cryoBrittleTimer > 0 ? 0.55 : 1.0;
     const baseSpeed = (u.type === 'robot' ? 1.25 : 1.95) * rustSlowdown * cryoSlowdown;
 
-    if (u.aiState === 'patrol') {
+    if (envDanger) {
+      // Emergency hydro-thrusters: boost upward out of any liquid pool/hazard toward dry ground!
+      u.vx = u.facing * baseSpeed * 1.05;
+      u.vy = Math.max(-3.0, u.vy - 0.52);
+      u.grounded = false;
+    } else if (u.aiState === 'patrol') {
+      if (this.hasLiquidPoolAhead(u, u.facing, world)) {
+        u.facing = u.facing === 1 ? -1 : 1;
+      }
       u.vx = u.facing * baseSpeed * 0.65;
       if (u.x <= u.patrolMinX) u.facing = 1;
       if (u.x >= u.patrolMaxX) u.facing = -1;
     } else if (u.aiState === 'pursue') {
       u.facing = player.x >= u.x ? 1 : -1;
-      u.vx = u.facing * baseSpeed;
-      u.aiThought = u.type === 'robot' ? 'HEAVY MECH ADVANCE' : 'PURSUING DR. VANCE';
+      if (this.hasLiquidPoolAhead(u, u.facing, world)) {
+        // Hold dry high ground and shoot across the vat rather than marching into the liquid!
+        u.vx = 0;
+        u.aiThought = 'HOLDING HIGH GROUND';
+      } else {
+        u.vx = u.facing * baseSpeed;
+        u.aiThought = u.type === 'robot' ? 'HEAVY MECH ADVANCE' : 'PURSUING DR. VANCE';
+      }
     } else if (u.aiState === 'attack') {
       u.facing = player.x >= u.x ? 1 : -1;
       const dist = Math.abs(player.x - u.x);
-      if (dist < 44) {
+      const desiredDir: 1 | -1 = dist < 44 ? (u.facing === 1 ? -1 : 1) : u.facing;
+      if (this.hasLiquidPoolAhead(u, desiredDir, world)) {
+        u.vx = 0;
+      } else if (dist < 44) {
         u.vx = -u.facing * baseSpeed * 0.55;
       } else if (dist > 88) {
         u.vx = u.facing * baseSpeed * 0.75;
@@ -1263,12 +1340,6 @@ export class JevDirector {
         u.vx *= 0.6;
       }
       u.aiThought = `FIRING ${u.weaponLoadout.toUpperCase()}`;
-    } else if (envDanger) {
-      u.vx = -u.facing * baseSpeed * 1.1;
-      if (u.grounded) {
-        u.vy = -3.1;
-        u.grounded = false;
-      }
     }
 
     u.vy = Math.min(4.2, u.vy + 0.21);
@@ -1290,7 +1361,7 @@ export class JevDirector {
         if (u.type === 'robot') {
           this.crushBrittleAhead(u, world);
         }
-        if ((u.aiState === 'pursue' || u.aiState === 'attack') && u.grounded) {
+        if ((u.aiState === 'pursue' || u.aiState === 'attack' || envDanger) && u.grounded) {
           u.vy = -3.2;
           u.grounded = false;
         } else {
@@ -1331,7 +1402,7 @@ export class JevDirector {
 
   private fireUnitWeapon(
     u: EnemyUnit,
-    _world: WorldGrid,
+    world: WorldGrid,
     player: Player,
     projectiles: Projectile[],
     sound: SoundEngine
@@ -1344,9 +1415,18 @@ export class JevDirector {
     const spawnX = u.x + nx * (u.width * 0.65);
     const spawnY = u.y + ny * (u.height * 0.4);
 
+    // If a walking bot's weapon barrel is submerged in liquid, hold fire while jetting out!
+    const barrelEl = world.getElement(Math.floor(spawnX), Math.floor(spawnY));
+    const barrelInLiquid = ELEMENTS[barrelEl].state === 'liquid';
+    if (u.type !== 'drone' && barrelInLiquid) {
+      u.cooldown = 15;
+      return;
+    }
+
     if (u.type === 'guard') {
       u.cooldown = 58;
-      if (u.weaponLoadout === 'cryo') {
+      // Never fire cryo while wet/near water so the guard doesn't freeze itself in solid ice!
+      if (u.weaponLoadout === 'cryo' && u.wetTimer <= 0) {
         sound.playThermalStream(true);
         projectiles.push({
           x: spawnX,
@@ -1359,7 +1439,7 @@ export class JevDirector {
           ttl: 55,
           fromPlayer: false,
         });
-      } else if (u.weaponLoadout === 'acid') {
+      } else if (u.weaponLoadout === 'acid' && !barrelInLiquid) {
         sound.playLiquidSpray(true);
         projectiles.push({
           x: spawnX,
@@ -1378,8 +1458,8 @@ export class JevDirector {
         projectiles.push({
           x: spawnX,
           y: spawnY,
-          vx: nx * 5.4,
-          vy: ny * 5.4,
+          vx: nx * 5.8,
+          vy: ny * 5.8,
           type: 'enemy_bolt',
           color: '#ff595e',
           radius: 5,

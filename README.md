@@ -1,5 +1,7 @@
 # Pixel Chemist: Saving Bibbi (`|Ψ⟩`)
 
+**[Play in your browser](https://healdgar.github.io/pixel-chemist/)** · [GitHub repository](https://github.com/healdgar/pixel-chemist)
+
 A 2D omnidirectional cellular-automata physics & alchemy sidescroller built with TypeScript and HTML5 Canvas (`1120 × 720` active physics grid, `448 × 272` viewport).
 
 Dr. Aris Thorne must breach **6 high-security environments** using real-time chemical reactions, thermodynamics, nuclear decay, and quantum mechanics to rescue **Bibbi** from her Cryo-Stasis Vault—while outsmarting a live-learning **J.E.V. ("System-One") Neural Decision Engine**.
@@ -50,3 +52,13 @@ Build for production:
 ```bash
 npm run build
 ```
+
+Run the regression checks:
+
+```bash
+npm test
+```
+
+Gameplay advances at 60 simulation ticks per second independently of display refresh rate. Menus and hidden tabs pause physics, combat, timers, and rewind history; rendering and menu controls remain responsive. Catch-up after a stall is capped at five simulation steps per frame.
+
+Rewind restores a complete checkpoint about five seconds earlier (one-second checkpoint intervals), or the earliest checkpoint available during the first few seconds. Player resources, enemies, defenses, projectiles, rescue progress, and J.E.V.'s learned weights all rewind together. Future checkpoints are discarded. Restarting a map resets the suit and temporary effects while retaining the selected tool. Escape or M opens/closes menus; sound can be toggled in the menu.

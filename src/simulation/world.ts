@@ -12,11 +12,20 @@ import { SoundEngine } from '../audio/soundEngine';
 
 export interface WorldSnapshot {
   grid: Uint8Array;
+  bgGrid: Uint8Array;
   temp: Float32Array;
   pressure: Float32Array;
   radiation: Float32Array;
   flags: Uint8Array;
   life: Uint16Array;
+  colorNoise: Int8Array;
+  parity: number;
+  rngState: number;
+  tickCount: number;
+  lastEventTick: number;
+  reactionEvents: ReactionEvent[];
+  fusionTriggered: boolean;
+  fusionCoords: { x: number; y: number } | null;
   playerX: number;
   playerY: number;
   playerHp: number;
@@ -195,11 +204,20 @@ export class WorldGrid {
   public createSnapshot(playerX: number, playerY: number, playerHp: number): WorldSnapshot {
     return {
       grid: new Uint8Array(this.grid),
+      bgGrid: new Uint8Array(this.bgGrid),
       temp: new Float32Array(this.temp),
       pressure: new Float32Array(this.pressure),
       radiation: new Float32Array(this.radiation),
       flags: new Uint8Array(this.flags),
       life: new Uint16Array(this.life),
+      colorNoise: new Int8Array(this.colorNoise),
+      parity: this.parity,
+      rngState: this.rngState,
+      tickCount: this.tickCount,
+      lastEventTick: this.lastEventTick,
+      reactionEvents: this.reactionEvents.map((event) => ({ ...event })),
+      fusionTriggered: this.fusionTriggered,
+      fusionCoords: this.fusionCoords ? { ...this.fusionCoords } : null,
       playerX,
       playerY,
       playerHp,
@@ -208,13 +226,20 @@ export class WorldGrid {
 
   public restoreSnapshot(snap: WorldSnapshot): void {
     this.grid.set(snap.grid);
+    this.bgGrid.set(snap.bgGrid);
     this.temp.set(snap.temp);
     this.pressure.set(snap.pressure);
     this.radiation.set(snap.radiation);
     this.flags.set(snap.flags);
     this.life.set(snap.life);
-    this.fusionTriggered = false;
-    this.fusionCoords = null;
+    this.colorNoise.set(snap.colorNoise);
+    this.parity = snap.parity;
+    this.rngState = snap.rngState;
+    this.tickCount = snap.tickCount;
+    this.lastEventTick = snap.lastEventTick;
+    this.reactionEvents = snap.reactionEvents.map((event) => ({ ...event }));
+    this.fusionTriggered = snap.fusionTriggered;
+    this.fusionCoords = snap.fusionCoords ? { ...snap.fusionCoords } : null;
   }
 
   public isSolidForEntity(x: number, y: number, ignoreQuantum: boolean = false): boolean {
