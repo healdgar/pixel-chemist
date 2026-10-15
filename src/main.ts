@@ -686,11 +686,35 @@ function updateTurretsAndBibbi(): void {
       level.bibbi.cageIntactCount = crystalCount;
 
       const distToBibbi = Math.hypot(player.x - bx, player.y - by);
-      if (distToBibbi < 24 || (crystalCount < 25 && distToBibbi < 40)) {
+      // Check if there is a breached line-of-sight opening between Bibbi and Dr. Vance
+      let crystalBlockingLine = false;
+      if (distToBibbi < 54 && distToBibbi > 1) {
+        const steps = Math.ceil(distToBibbi / 2);
+        for (let s = 1; s < steps; s++) {
+          const rx = Math.round(bx + ((player.x - bx) * s) / steps);
+          const ry = Math.round(by + ((player.y - by) * s) / steps);
+          if (world.getElement(rx, ry) === ElementId.CHRONITON_CRYSTAL) {
+            crystalBlockingLine = true;
+            break;
+          }
+        }
+      }
+
+      // Full pod ring has ~116 crystal sample points; breaching one side drops it below ~100 or opens a clear line of sight
+      const cageBreached = !crystalBlockingLine || crystalCount < 100;
+      if (distToBibbi < 32 || (cageBreached && distToBibbi < 54)) {
         level.bibbi.carried = true;
         player.carryingBibbi = true;
-        sound.playQuantumBeam(880);
-        gamepad.triggerRumble(140, 0.35, 0.55);
+        // Dissolve remaining Chroniton Stasis ring so the pod bursts open cleanly when she hops on your back
+        for (let dy = -34; dy <= 34; dy++) {
+          for (let dx = -34; dx <= 34; dx++) {
+            if (world.getElement(bx + dx, by + dy) === ElementId.CHRONITON_CRYSTAL) {
+              world.setElement(bx + dx, by + dy, ElementId.EMPTY, 22);
+            }
+          }
+        }
+        sound.playVictory();
+        gamepad.triggerRumble(180, 0.45, 0.7);
         jevDirector.reportIncident(
           35,
           `ALERT: Intruder has Bibbi on his back! Intercept before he reaches the ${level.escapeVehicle.name}!`
@@ -700,7 +724,7 @@ function updateTurretsAndBibbi(): void {
     } else if (level.bibbi.carried && level.bibbi.hp > 0) {
       const ev = level.escapeVehicle;
       const distToEv = Math.hypot(player.x - ev.x, player.y - ev.y);
-      if (distToEv < 30) {
+      if (distToEv < 38) {
         level.bibbi.rescued = true;
         player.carryingBibbi = false;
         level.bibbi.x = ev.x;

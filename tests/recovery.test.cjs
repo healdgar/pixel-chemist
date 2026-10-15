@@ -149,3 +149,27 @@ test('curriculum covers all six directives, including neutral pressure-tool inte
   assert.ok(result.counts.every((count) => count > 0), JSON.stringify(result));
   assert.ok(result.neutralIntercepts > 0);
 });
+
+test('touching Bibbi puts her on the player back first and only reaching the escape vehicle wins', () => {
+  const game = createGame();
+  game.arena();
+  game.run(`
+    level.bibbi.x = 300; level.bibbi.y = 300; level.bibbi.carried = false; level.bibbi.rescued = false;
+    level.escapeVehicle = { x: 100, y: 100, name: 'Cryo-VTOL Dropship', type: 'dropship' };
+    player.x = 290; player.y = 300;
+    updateTurretsAndBibbi();
+  `);
+  assert.equal(game.run('level.bibbi.carried'), true);
+  assert.equal(game.run('player.carryingBibbi'), true);
+  assert.equal(game.run('level.bibbi.rescued'), false);
+  assert.equal(game.element('event-dialog').open, false);
+
+  game.run(`
+    player.x = 105; player.y = 100;
+    updateTurretsAndBibbi();
+  `);
+  assert.equal(game.run('level.bibbi.rescued'), true);
+  assert.equal(game.run('player.carryingBibbi'), false);
+  assert.equal(game.element('event-dialog').open, true);
+});
+

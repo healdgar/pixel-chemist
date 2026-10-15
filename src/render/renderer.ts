@@ -888,31 +888,6 @@ export class WorldRenderer {
     ctx.fillStyle = '#4cc9f0';
     ctx.fillRect(px - f * 2.6 * ex, py - 2 * ey, 1.4 * ex, 4 * ey);
 
-    // If Bibbi is riding piggyback on Dr. Vance's back!
-    const b = level.bibbi;
-    if (b.carried && !b.rescued) {
-      const bx = px - f * 3.1 * ex;
-      const by = py - 2.3 * ey + Math.sin(tick * 0.25) * 0.4 * ey;
-      // Bibbi's orange pigtails & head peeking over shoulder
-      ctx.fillStyle = '#ff9f1c';
-      ctx.fillRect(bx - 1.8 * ex, by - 3.0 * ey, 3.6 * ex, 1.5 * ey);
-      ctx.fillStyle = '#ffe5d9';
-      ctx.fillRect(bx - 1.2 * ex, by - 2.0 * ey, 2.4 * ex, 2.0 * ey);
-      // Bibbi's magenta jacket & arms hugging Dr. Vance's neck
-      ctx.fillStyle = '#f72585';
-      ctx.fillRect(bx - 1.5 * ex, by, 3.0 * ex, 2.8 * ey);
-      ctx.fillRect(bx, by - 0.6 * ey, f * 2.4 * ex, 1.0 * ey);
-
-      // Delicate Bibbi HP Bar above her head when hurt or carried
-      if (b.hp < b.maxHp) {
-        const barW = 6.5 * ex;
-        ctx.fillStyle = 'rgba(10, 14, 24, 0.9)';
-        ctx.fillRect(px - barW / 2, py - 7.0 * ey, barW, 1.1 * ey);
-        ctx.fillStyle = b.hp < 35 ? '#ff0055' : '#ff99c8';
-        ctx.fillRect(px - barW / 2, py - 7.0 * ey, barW * Math.max(0, b.hp / b.maxHp), 1.1 * ey);
-      }
-    }
-
     // Hazmat Suit Body
     ctx.fillStyle = '#ffd166';
     ctx.fillRect(px - 2 * ex, py - 1.5 * ey, 4 * ex, 4.2 * ey);
@@ -933,6 +908,38 @@ export class WorldRenderer {
     ctx.fillStyle = '#343a40';
     ctx.fillRect(px - 1.6 * ex, py + (2.7 + legSwing * 0.4) * ey, 1.3 * ex, 2 * ey);
     ctx.fillRect(px + 0.3 * ex, py + (2.7 - legSwing * 0.4) * ey, 1.3 * ex, 2 * ey);
+
+    // If Bibbi is riding piggyback on Dr. Vance's back (drawn over his backpack/shoulders so she's clearly visible!)
+    const b = level.bibbi;
+    if (b.carried && !b.rescued) {
+      const bx = px - f * 2.4 * ex;
+      const by = py - 2.6 * ey + Math.sin(tick * 0.25) * 0.35 * ey;
+      // Bibbi's orange pigtails & head peeking above Dr. Vance's shoulder
+      ctx.fillStyle = '#ff9f1c';
+      ctx.fillRect(bx - 2.2 * ex, by - 3.4 * ey, 4.4 * ex, 1.8 * ey);
+      ctx.fillStyle = '#ffe5d9';
+      ctx.fillRect(bx - 1.4 * ex, by - 2.2 * ey, 2.8 * ex, 2.2 * ey);
+      ctx.fillStyle = '#1d3557';
+      ctx.fillRect(bx + (f > 0 ? 0.2 : -0.9) * ex, by - 1.6 * ey, 0.7 * ex, 0.7 * ey);
+      // Bibbi's magenta jacket, arms hugging Dr. Vance's chest/shoulders, and cyan boots
+      ctx.fillStyle = '#f72585';
+      ctx.fillRect(bx - 1.6 * ex, by, 3.2 * ex, 3.0 * ey);
+      ctx.fillRect(bx, by + 0.2 * ey, f * 3.2 * ex, 1.1 * ey);
+      ctx.fillStyle = '#4cc9f0';
+      ctx.fillRect(bx - 1.0 * ex, by + 3.0 * ey, 1.6 * ex, 1.3 * ey);
+
+      // Delicate Bibbi HP Bar & Piggyback Tag above Dr. Vance
+      const barW = 7.0 * ex;
+      ctx.fillStyle = 'rgba(10, 14, 24, 0.9)';
+      ctx.fillRect(px - barW / 2, py - 7.4 * ey, barW, 1.1 * ey);
+      ctx.fillStyle = b.hp < 40 ? '#ff0055' : '#06d6a0';
+      ctx.fillRect(px - barW / 2, py - 7.4 * ey, barW * Math.max(0, b.hp / b.maxHp), 1.1 * ey);
+
+      ctx.font = 'bold 9px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = b.hp < 40 ? '#ff4d6d' : '#ff99c8';
+      ctx.fillText(`♥ BIBBI ${Math.ceil(b.hp)}%`, px, py - 7.9 * ey);
+    }
 
     // Omni-Tool Arm aiming toward mouse cursor
     const angle = Math.atan2(mouseWorld.wy - player.y, mouseWorld.wx - player.x);
