@@ -62,3 +62,10 @@ npm test
 Gameplay advances at 60 simulation ticks per second independently of display refresh rate. Menus and hidden tabs pause physics, combat, timers, and rewind history; rendering and menu controls remain responsive. Catch-up after a stall is capped at five simulation steps per frame.
 
 Rewind restores a complete checkpoint about five seconds earlier (one-second checkpoint intervals), or the earliest checkpoint available during the first few seconds. Player resources, enemies, defenses, projectiles, rescue progress, and J.E.V.'s learned weights all rewind together. Future checkpoints are discarded. Restarting a map resets the suit and temporary effects while retaining the selected tool. Escape or M opens/closes menus; sound can be toggled in the menu.
+
+---
+
+## Copyright & License
+
+**Copyright © 2026 Six Cailloux, LLC. All rights reserved.**
+

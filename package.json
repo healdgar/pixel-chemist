@@ -2,6 +2,8 @@
   "name": "pixel-chemist-saving-bibbi",
   "private": true,
   "version": "1.0.0",
+  "author": "Six Cailloux, LLC",
+  "license": "UNLICENSED",
   "type": "module",
   "scripts": {
     "dev": "vite",
