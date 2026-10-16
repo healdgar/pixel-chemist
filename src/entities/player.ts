@@ -465,22 +465,50 @@ export class Player {
         });
         break;
 
-      case 2: // Thermal Lance (Heat) / Cryo-Jet (Cold)
-        this.fireCooldown = 2;
+      case 2: // Flamethrower (Heat) / Cryo-Jet (Cold)
+        this.fireCooldown = secondary ? 2 : 1;
         sound.playThermalStream(secondary);
-        for (let k = 0; k < 2; k++) {
-          const spread = (Math.random() - 0.5) * 0.25;
-          projectiles.push({
-            x: spawnX,
-            y: spawnY,
-            vx: (nx + spread) * 7.4,
-            vy: (ny + spread) * 7.4,
-            type: secondary ? 'cryo' : 'heat',
-            color: secondary ? '#72efdd' : '#ff595e',
-            radius: 9,
-            ttl: 55,
-            fromPlayer: true
-          });
+        if (secondary) {
+          for (let k = 0; k < 2; k++) {
+            const spread = (Math.random() - 0.5) * 0.24;
+            projectiles.push({
+              x: spawnX,
+              y: spawnY,
+              vx: (nx + spread) * 6.8,
+              vy: (ny + spread) * 6.8,
+              type: 'cryo',
+              color: '#72efdd',
+              radius: 7,
+              ttl: 44,
+              fromPlayer: true
+            });
+          }
+        } else {
+          // Continuous Flamethrower jet: 3 flame tongues per tick with nozzle velocity variance
+          const muzzleGx = Math.floor(spawnX);
+          const muzzleGy = Math.floor(spawnY);
+          if (_world.inBounds(muzzleGx, muzzleGy) && _world.getElement(muzzleGx, muzzleGy) === ElementId.EMPTY) {
+            _world.setElement(muzzleGx, muzzleGy, ElementId.FIRE, 1050, 12);
+          }
+          for (let k = 0; k < 3; k++) {
+            const angleOffset = (Math.random() - 0.5) * 0.26;
+            const cosA = Math.cos(angleOffset);
+            const sinA = Math.sin(angleOffset);
+            const dirX = nx * cosA - ny * sinA;
+            const dirY = nx * sinA + ny * cosA;
+            const speed = 4.6 + Math.random() * 2.1;
+            projectiles.push({
+              x: spawnX + dirX * (k * 1.5),
+              y: spawnY + dirY * (k * 1.5),
+              vx: dirX * speed + this.vx * 0.25,
+              vy: dirY * speed,
+              type: 'heat',
+              color: k === 0 ? '#ffbe0b' : k === 1 ? '#fb5607' : '#ff595e',
+              radius: 4,
+              ttl: 24 + ((Math.random() * 12) | 0),
+              fromPlayer: true
+            });
+          }
         }
         break;
 

@@ -56,13 +56,13 @@ export const TOOLS: ToolDef[] = [
   {
     id: 2,
     key: '2',
-    name: 'Thermal Lance / Cryo-Jet',
+    name: 'Plasma Flamethrower / Cryo-Jet',
     shortName: 'THERMAL',
-    primaryLabel: 'LMB: Plasma Heat Ray (+2800°C)',
+    primaryLabel: 'LMB: Flamethrower Stream (+2800°C)',
     secondaryLabel: 'RMB: Liquid Nitrogen Cryo-Jet (-196°C)',
     color: '#ff6b6b',
     description:
-      'Injects or drains thermal energy. Ignite Thermite, melt Stone into Magma, or flash-freeze Steel bulkheads with LN₂ so they shatter under pressure!'
+      'Projects a continuous stream of roaring flame or cryogenic LN₂. Ignite Thermite, melt Stone into Magma, boil liquids, or flash-freeze Steel bulkheads so they shatter under pressure!'
   },
   {
     id: 3,
@@ -209,8 +209,10 @@ export function updateProjectiles(
             const dmg =
               p.type === 'implosion' || p.type === 'strong_unbind'
                 ? 45
-                : p.type === 'kinetic' || p.type === 'heat' || p.type === 'weak_force' || p.type === 'neutron'
+                : p.type === 'kinetic' || p.type === 'weak_force' || p.type === 'neutron'
                 ? 26
+                : p.type === 'heat'
+                ? 6
                 : 16;
             bibbi.hp = Math.max(0, bibbi.hp - dmg);
             bibbi.inDanger = true;
@@ -256,6 +258,28 @@ export function updateProjectiles(
 
       const el = world.getElement(gx, gy);
       const state = ELEMENTS[el].state;
+
+      // Flamethrower in-flight stream: continuously deposits FIRE particles and heats cells along the beam!
+      if (p.type === 'heat' && s === 0) {
+        for (let ty = -2; ty <= 2; ty++) {
+          for (let tx = -2; tx <= 2; tx++) {
+            const cx = gx + tx;
+            const cy = gy + ty;
+            if (!world.inBounds(cx, cy)) continue;
+            const cIdx = world.idx(cx, cy);
+            world.temp[cIdx] = Math.min(3500, world.temp[cIdx] + 75);
+            if (tx * tx + ty * ty <= 2 && world.grid[cIdx] === ElementId.EMPTY && Math.random() < 0.48) {
+              world.setElement(cx, cy, ElementId.FIRE, 980, 10 + ((Math.random() * 14) | 0));
+            }
+          }
+        }
+      } else if (p.type === 'cryo' && s === 0) {
+        const cIdx = world.idx(gx, gy);
+        world.temp[cIdx] = Math.max(-260, world.temp[cIdx] - 55);
+        if (el === ElementId.EMPTY && Math.random() < 0.25) {
+          world.setElement(gx, gy, ElementId.NITROGEN_GAS, -180, 22);
+        }
+      }
 
       // Quantum tunneling projectiles pass through air/gas/liquids and apply superposition to solids/powders
       if (p.type === 'quantum_tunnel') {
@@ -306,9 +330,12 @@ export function updateProjectiles(
       }
     }
 
-    // Apply gravity to chemical blobs
+    // Apply gravity to chemical blobs, and buoyant deceleration to flamethrower streams
     if (p.type === 'chemical') {
       p.vy += 0.12;
+    } else if (p.type === 'heat') {
+      p.vx *= 0.962;
+      p.vy = p.vy * 0.962 - 0.045;
     }
 
     if (hit) {
@@ -344,7 +371,7 @@ function handleDirectEnemyHit(
       u.hp -= 6;
       break;
     case 'heat':
-      u.hp -= 12;
+      u.hp -= 4.5;
       break;
     case 'time_accel':
       if (u.wetTimer > 0 || u.type === 'robot') {
@@ -408,9 +435,9 @@ function this_handleProjectileImpact(
         bibbi.inDanger = true;
         bibbi.hurtReason = 'Blasted by your Pressure Cannon shockwave!';
       } else if (p.type === 'heat') {
-        bibbi.hp = Math.max(0, bibbi.hp - 14);
+        bibbi.hp = Math.max(0, bibbi.hp - 4.5);
         bibbi.inDanger = true;
-        bibbi.hurtReason = 'Scorched by your Thermal Lance!';
+        bibbi.hurtReason = 'Scorched by your Flamethrower!';
       } else if (p.type === 'cryo') {
         bibbi.hp = Math.max(0, bibbi.hp - 10);
         bibbi.inDanger = true;
@@ -432,7 +459,7 @@ function this_handleProjectileImpact(
       world.applyPressureImpulse(gx, gy, p.radius, 1950, sound);
       break;
     case 'heat':
-      world.applyThermalBrush(gx, gy, p.radius, 520, ElementId.FIRE);
+      world.applyThermalBrush(gx, gy, p.radius, 185, ElementId.FIRE);
       break;
     case 'cryo':
       world.applyThermalBrush(gx, gy, p.radius, -260, ElementId.LIQUID_NITROGEN);
