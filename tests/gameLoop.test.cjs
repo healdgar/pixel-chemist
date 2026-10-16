@@ -102,3 +102,28 @@ test('stalls have bounded catch-up and hidden-tab time never advances gameplay',
   game.frame(30000 + 1000 / 60);
   assert.equal(game.run('tick'), 6);
 });
+
+test('KeyP and HUD pause button freeze simulation cleanly without opening a modal dialog', () => {
+  const game = createGame();
+  game.arena();
+  game.frame(0);
+  game.frame(1000 / 60);
+  assert.equal(game.run('tick'), 1);
+
+  game.key('KeyP');
+  assert.equal(game.run('manualPause'), true);
+  assert.equal(game.element('menu-dialog').open, false);
+  assert.equal(game.element('btn-pause').textContent, '▶');
+
+  for (let now = 1000; now <= 5000; now += 1000) game.frame(now);
+  assert.equal(game.run('tick'), 1);
+
+  game.element('btn-pause').dispatch('click');
+  assert.equal(game.run('manualPause'), false);
+  assert.equal(game.element('btn-pause').textContent, '⏸');
+  game.frame(5001);
+  assert.equal(game.run('tick'), 1);
+  game.frame(5001 + 1000 / 60);
+  assert.equal(game.run('tick'), 2);
+});
+

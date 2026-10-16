@@ -290,6 +290,17 @@ let mouseScreenY = window.innerHeight / 2;
 let mouseLeftDown = false;
 let mouseRightDown = false;
 let thermalVision = false;
+let manualPause = false;
+
+function toggleManualPause(forceState?: boolean): void {
+  manualPause = forceState !== undefined ? forceState : !manualPause;
+  const pauseBtn = document.getElementById('btn-pause');
+  if (pauseBtn) {
+    pauseBtn.textContent = manualPause ? '▶' : '⏸';
+    pauseBtn.style.borderColor = manualPause ? '#ffd166' : '';
+    pauseBtn.style.color = manualPause ? '#ffd166' : '';
+  }
+}
 
 // Controller Right-Thumbstick Reticle State (offset relative to player so reticle travels with character)
 let usingGamepadAim = false;
@@ -303,6 +314,11 @@ window.addEventListener('keydown', (e) => {
     const openDialog = document.querySelector<HTMLDialogElement>('dialog[open]');
     if (openDialog) openDialog.close();
     else menuDialog?.showModal();
+    return;
+  }
+  if (e.code === 'KeyP') {
+    e.preventDefault();
+    if (!e.repeat) toggleManualPause();
     return;
   }
   keys.add(e.code);
@@ -490,6 +506,7 @@ document.getElementById('btn-jev-reset-weights')?.addEventListener('click', () =
   renderJevTelemetryModal();
 });
 
+document.getElementById('btn-pause')?.addEventListener('click', () => toggleManualPause());
 document.getElementById('btn-rewind')?.addEventListener('click', rewindTime);
 document.getElementById('btn-qdash')?.addEventListener('click', () => {
   menuDialog?.close();
@@ -957,6 +974,7 @@ const simulationClock = new FixedStepClock();
 
 function isSimulationPaused(): boolean {
   return (
+    manualPause ||
     player.hp <= 0 ||
     level.bibbi.hp <= 0 ||
     document.hidden ||
