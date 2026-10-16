@@ -327,7 +327,7 @@ export class Player {
     let maxTemp = 22;
     let minTemp = 22;
     let radSum = 0;
-    let inAcid = false;
+    let maxAcidConc = 0;
     let inBioGel = false;
     let inFusion = false;
 
@@ -343,7 +343,10 @@ export class Player {
         if (t < minTemp) minTemp = t;
         radSum += world.radiation[i];
 
-        if (el === ElementId.ACID) inAcid = true;
+        if (el === ElementId.ACID) {
+          const conc = world.getConcentration(i);
+          if (conc > maxAcidConc) maxAcidConc = conc;
+        }
         if (el === ElementId.BIO_GEL) inBioGel = true;
         if (el === ElementId.FUSION_PLASMA) inFusion = true;
       }
@@ -399,8 +402,8 @@ export class Player {
 
     if (inFusion) {
       this.hp = Math.max(0, this.hp - 1.8);
-    } else if (inAcid) {
-      this.hp = Math.max(0, this.hp - 0.22);
+    } else if (maxAcidConc > 0) {
+      this.hp = Math.max(0, this.hp - 0.22 * (maxAcidConc / 100));
       sound.playSizzle();
     } else if (maxTemp > 450) {
       this.hp = Math.max(0, this.hp - 0.18);
@@ -419,7 +422,7 @@ export class Player {
     if (inBioGel) {
       this.hp = Math.min(this.maxHp, this.hp + 0.6);
       this.radiationDose = Math.max(0, this.radiationDose - 0.8);
-    } else if (!inAcid && maxTemp <= 150 && radSum <= 1.0 && this.hp > 0 && (this.oxygen > 0 || (!this.submerged && !onSpaceStation))) {
+    } else if (maxAcidConc === 0 && maxTemp <= 150 && radSum <= 1.0 && this.hp > 0 && (this.oxygen > 0 || (!this.submerged && !onSpaceStation))) {
       // Slow suit self-repair nano-gel
       this.hp = Math.min(this.maxHp, this.hp + 0.03);
     }

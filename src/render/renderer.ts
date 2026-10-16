@@ -276,6 +276,17 @@ export class WorldRenderer {
         let g = def.baseColor[1] + delta;
         let b = def.baseColor[2] + delta;
 
+        // Aqueous dilution color blending for ACID / ALKALI (blends toward Water [42, 138, 235] as concentration drops)
+        if (el === ElementId.ACID || el === ElementId.ALKALI) {
+          const conc = world.life[i] > 0 ? (world.life[i] > 100 ? 100 : world.life[i]) : 100;
+          if (conc < 99) {
+            const w = (100 - conc) * 0.0085;
+            r = (r * (1 - w) + 42 * w) | 0;
+            g = (g * (1 - w) + 138 * w) | 0;
+            b = (b * (1 - w) + 235 * w) | 0;
+          }
+        }
+
         // Liquid shimmer animation (using SIN_LUT)
         if (def.state === 'liquid') {
           const wave = (SIN_LUT[((tick << 2) + (wx << 3) + (wy << 2)) & 255] * 10) | 0;
@@ -1016,7 +1027,9 @@ export class WorldRenderer {
       const press = world.pressure[i];
       const flags = world.flags[i];
 
-      let badge = `${def.symbol} (${def.name}) | ${temp}°C`;
+      const isSolution = el === ElementId.ACID || el === ElementId.ALKALI;
+      const concStr = isSolution ? ` ${world.getConcentration(i)}%` : '';
+      let badge = `${def.symbol} (${def.name}${concStr}) | ${temp}°C`;
       if (press >= 1) badge += ` | ${Math.round(press)} GPa`;
       if (flags & FLAG_CRYO_BRITTLE) badge += ' [CRYO-BRITTLE]';
       if (flags & FLAG_QUANTUM_TUNNEL) badge += ' [|Ψ⟩ TUNNEL]';

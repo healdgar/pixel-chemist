@@ -639,8 +639,10 @@ function updateTurretsAndBibbi(): void {
         level.bibbi.hurtReason = 'cryogenic frostbite';
       }
 
-      if (
-        bEl === ElementId.ACID ||
+      if (bEl === ElementId.ACID) {
+        level.bibbi.hp -= 1.15 * (world.getConcentration(bi) / 100);
+        level.bibbi.hurtReason = 'caustic / alchemical exposure';
+      } else if (
         bEl === ElementId.TOXIC_GAS ||
         bEl === ElementId.PLASMA ||
         bEl === ElementId.QUARK_PLASMA ||

@@ -173,3 +173,73 @@ test('touching Bibbi puts her on the player back first and only reaching the esc
   assert.equal(game.element('event-dialog').open, true);
 });
 
+test('water dilutes acid and alkali solutions, and salt dissolves in water into brine', () => {
+  const game = createGame();
+  game.arena();
+  const res = JSON.parse(game.run(`JSON.stringify((() => {
+    // 1. Test Acid (25) + Water (22) dilution in a sealed diamond (6) beaker
+    for (let x = 200; x <= 212; x++) {
+      for (let y = 200; y <= 212; y++) {
+        if (x === 200 || x === 212 || y === 212) {
+          world.setElement(x, y, 6); // DIAMOND wall (acid-proof)
+        } else if (y >= 204) {
+          // 2 rows of ACID (25) under 6 rows of WATER (22) -> excess water dilutes acid
+          world.setElement(x, y, y >= 210 ? 25 : 22);
+        } else {
+          world.setElement(x, y, 0);
+        }
+      }
+    }
+    const initialAcidConc = world.getConcentration(world.idx(206, 211));
+
+    // 2. Test Salt (19) + Water (22) dissolution into Salt Water (23) in a second sealed diamond beaker
+    for (let x = 230; x <= 240; x++) {
+      for (let y = 200; y <= 212; y++) {
+        if (x === 230 || x === 240 || y === 212) {
+          world.setElement(x, y, 6);
+        } else if (y >= 209) {
+          world.setElement(x, y, 19); // SALT
+        } else if (y >= 204) {
+          world.setElement(x, y, 22); // WATER
+        } else {
+          world.setElement(x, y, 0);
+        }
+      }
+    }
+
+    for (let step = 0; step < 90; step++) {
+      world.step(220, 206, sound);
+    }
+
+    let minAcidConc = 100;
+    let remainingFullAcid = 0;
+    let totalAcidCount = 0;
+    for (let x = 201; x < 212; x++) {
+      for (let y = 201; y < 212; y++) {
+        const idx = world.idx(x, y);
+        if (world.grid[idx] === 25) {
+          totalAcidCount++;
+          const c = world.getConcentration(idx);
+          if (c < minAcidConc) minAcidConc = c;
+          if (c === 100) remainingFullAcid++;
+        }
+      }
+    }
+
+    let saltWaterCount = 0;
+    for (let x = 231; x < 240; x++) {
+      for (let y = 201; y < 212; y++) {
+        if (world.grid[world.idx(x, y)] === 23) saltWaterCount++; // SALT_WATER
+      }
+    }
+
+    return { initialAcidConc, minAcidConc, remainingFullAcid, totalAcidCount, saltWaterCount };
+  })())`));
+
+  assert.equal(res.initialAcidConc, 100);
+  assert.ok(res.remainingFullAcid === 0, `Expected no 100% acid left after dilution, got ${JSON.stringify(res)}`);
+  assert.ok(res.totalAcidCount === 0 || res.minAcidConc < 90, `Expected acid to dilute, got ${JSON.stringify(res)}`);
+  assert.ok(res.saltWaterCount > 0, `Expected salt to dissolve into SALT_WATER, got ${JSON.stringify(res)}`);
+});
+
+
