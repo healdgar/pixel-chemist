@@ -1047,9 +1047,11 @@ export class WorldGrid {
     }
 
     if (state === 'liquid') {
+      const W = this.width;
       const by = y + 1;
-      if (by < this.height - 1) {
-        const bi = by * this.width + x;
+      const canDrop = by < this.height - 1;
+      if (canDrop) {
+        const bi = by * W + x;
         if (this.canDisplace(i, effDensity, bi)) {
           this.swap(i, bi);
           return;
@@ -1057,43 +1059,80 @@ export class WorldGrid {
         const dir = this.fastCoin() ? -1 : 1;
         const b1x = x + dir;
         const b2x = x - dir;
-        if (b1x > 1 && b1x < this.width - 2 && this.canDisplace(i, effDensity, by * this.width + b1x)) {
-          this.swap(i, by * this.width + b1x);
+        if (b1x > 1 && b1x < W - 2 && this.canDisplace(i, effDensity, by * W + b1x)) {
+          this.swap(i, by * W + b1x);
           return;
         }
-        if (b2x > 1 && b2x < this.width - 2 && this.canDisplace(i, effDensity, by * this.width + b2x)) {
-          this.swap(i, by * this.width + b2x);
+        if (b2x > 1 && b2x < W - 2 && this.canDisplace(i, effDensity, by * W + b2x)) {
+          this.swap(i, by * W + b2x);
           return;
         }
       }
+
       const hDir = this.fastCoin() ? -1 : 1;
       const isMiscible = this.isMiscibleAqueous(el);
       const isSol = this.isAqueousSolution(el);
-      for (let step = 1; step <= 4; step++) {
-        const hx = x + hDir * step;
-        if (hx <= 1 || hx >= this.width - 2) break;
-        const hi = y * this.width + hx;
-        const targetEl = this.grid[hi] as ElementId;
-        if (this.canDisplace(i, effDensity, hi)) {
-          this.swap(i, hi);
+      // Higher-viscosity liquids (Lava, Molten Steel, Oil, Bio-Gel) spread fewer pixels per frame than Water/Acid
+      const maxSpread =
+        el === ElementId.LAVA || el === ElementId.MOLTEN_STEEL
+          ? 2
+          : el === ElementId.OIL || el === ElementId.BIO_GEL
+            ? 4
+            : 8;
+      // Hydrostatic head: true if there is liquid directly above (x, y) pressing down on this pixel
+      const hasLiquidHead = y > 2 && ELEMENTS[this.grid[(y - 1) * W + x] as ElementId].state === 'liquid';
+
+      // Try primary random direction first, then fallback to opposite direction so slopes never stall 50% of ticks
+      for (let dPass = 0; dPass < 2; dPass++) {
+        const dir = dPass === 0 ? hDir : -hDir;
+        let bestTarget = -1;
+        let tunneledThroughLiquid = false;
+
+        for (let step = 1; step <= maxSpread; step++) {
+          const hx = x + dir * step;
+          if (hx <= 1 || hx >= W - 2) break;
+          const hi = y * W + hx;
+          const targetEl = this.grid[hi] as ElementId;
+
+          // If there is a lower empty/displaceable spot at (hx, y + 1), immediately cascade down the shallow slope!
+          if (canDrop) {
+            const bhi = by * W + hx;
+            if (this.canDisplace(i, effDensity, bhi)) {
+              this.swap(i, bhi);
+              return;
+            }
+          }
+
+          if (this.canDisplace(i, effDensity, hi)) {
+            if (!tunneledThroughLiquid || hasLiquidHead) {
+              bestTarget = hi;
+            }
+            // If tunneling out of a pressurized hump, pop out at the first open lateral edge cell;
+            // if gliding in open air, keep scanning up to maxSpread for fast lateral flow.
+            if (tunneledThroughLiquid || (step >= 2 && targetEl !== ElementId.EMPTY)) break;
+          } else if (targetEl === el || (isMiscible && this.isMiscibleAqueous(targetEl))) {
+            tunneledThroughLiquid = true;
+            // Equalize solute concentration across the pool width
+            if (isSol && targetEl === el) {
+              const c1 = this.getConcentration(i);
+              const c2 = this.getConcentration(hi);
+              if (Math.abs(c1 - c2) >= 2) {
+                const avg = (c1 + c2) >> 1;
+                this.life[i] = avg;
+                this.life[hi] = c1 + c2 - avg;
+              }
+            } else if (isMiscible && targetEl !== el && dPass === 0 && step === 1 && this.fastRand() < 0.28) {
+              this.swap(i, hi);
+              return;
+            }
+          } else {
+            break;
+          }
+        }
+
+        if (bestTarget !== -1) {
+          this.swap(i, bestTarget);
           return;
-        } else if (isSol && targetEl === el) {
-          // Long-range horizontal eddy mixing equalizes concentration across the width of a solution pool
-          const c1 = this.getConcentration(i);
-          const c2 = this.getConcentration(hi);
-          if (Math.abs(c1 - c2) >= 2) {
-            const avg = (c1 + c2) >> 1;
-            this.life[i] = avg;
-            this.life[hi] = c1 + c2 - avg;
-          }
-        } else if (isMiscible && targetEl !== el && this.isMiscibleAqueous(targetEl)) {
-          // Miscible aqueous solutions interdiffuse horizontally instead of blocking each other
-          if (this.fastRand() < 0.28) {
-            this.swap(i, hi);
-            return;
-          }
-        } else if (targetEl !== ElementId.EMPTY) {
-          break;
         }
       }
       return;

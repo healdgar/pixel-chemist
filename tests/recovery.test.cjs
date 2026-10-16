@@ -242,4 +242,45 @@ test('water dilutes acid and alkali solutions, and salt dissolves in water into 
   assert.ok(res.saltWaterCount > 0, `Expected salt to dissolve into SALT_WATER, got ${JSON.stringify(res)}`);
 });
 
+test('a tall hump of water rapidly flows laterally and finds a flat level instead of mounding like sand', () => {
+  const game = createGame();
+  game.arena();
+  const res = JSON.parse(game.run(`JSON.stringify((() => {
+    // Build a 30-wide flat diamond basin (x = 190..221, floor at y = 212)
+    for (let x = 190; x <= 221; x++) {
+      for (let y = 195; y <= 212; y++) {
+        if (x === 190 || x === 221 || y === 212) {
+          world.setElement(x, y, 6); // DIAMOND wall/floor
+        } else if (x >= 203 && x <= 208 && y >= 202 && y <= 211) {
+          // 6-wide x 10-tall column of WATER (60 pixels total -> should flatten to 2 rows deep across 30 width!)
+          world.setElement(x, y, 22);
+        } else {
+          world.setElement(x, y, 0);
+        }
+      }
+    }
+
+    for (let step = 0; step < 45; step++) {
+      world.step(205, 206, sound);
+    }
+
+    let highestWaterY = 212;
+    let waterCount = 0;
+    for (let x = 191; x < 221; x++) {
+      for (let y = 196; y < 212; y++) {
+        if (world.grid[world.idx(x, y)] === 22) {
+          waterCount++;
+          if (y < highestWaterY) highestWaterY = y;
+        }
+      }
+    }
+    const maxColumnHeight = 212 - highestWaterY;
+    return { waterCount, maxColumnHeight };
+  })())`));
+
+  assert.equal(res.waterCount, 60);
+  assert.ok(res.maxColumnHeight <= 3, `Expected 10-tall water column to flatten to <= 3 rows, got ${JSON.stringify(res)}`);
+});
+
+
 
