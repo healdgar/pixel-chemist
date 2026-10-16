@@ -1166,9 +1166,10 @@ export class JevDirector {
       u.cryoBrittleTimer = 160;
     }
 
-    if (maxPress > 55) {
-      const mult = u.cryoBrittleTimer > 0 ? 3.2 : 1.0;
-      u.hp -= maxPress * 0.35 * mult;
+    if (maxPress > 22) {
+      const mult = (u.cryoBrittleTimer > 0 ? 3.2 : 1.0) * (u.type === 'drone' ? 1.45 : 1.0);
+      u.hp -= maxPress * 0.42 * mult;
+      u.vy -= Math.min(2.4, maxPress * 0.014);
       if (u.cryoBrittleTimer > 0) {
         world.addReactionPopup(cx, cy - 10, '❄️ CRYO-SHATTER CRITICAL!', '#72efdd');
       }
@@ -1201,18 +1202,54 @@ export class JevDirector {
     const cy = Math.floor(u.y);
     const blastRadius = u.type === 'robot' ? 16 : 11;
     world.applyPressureImpulse(cx, cy, blastRadius, 165, sound);
-    for (let dy = -4; dy <= 4; dy++) {
-      for (let dx = -4; dx <= 4; dx++) {
-        if (
-          world.inBounds(cx + dx, cy + dy) &&
-          world.getElement(cx + dx, cy + dy) === ElementId.EMPTY
-        ) {
-          world.setElement(
-            cx + dx,
-            cy + dy,
-            u.rustedLevel > 30 ? ElementId.RUST : ElementId.FIRE,
-            750
-          );
+
+    // Materialize the unit's physical anatomy into real world pixels!
+    const rx = u.type === 'robot' ? 6 : 5;
+    const ry = u.type === 'robot' ? 7 : 5;
+    for (let dy = -ry; dy <= ry; dy++) {
+      for (let dx = -rx; dx <= rx; dx++) {
+        const px = cx + dx;
+        const py = cy + dy;
+        if (!world.inBounds(px, py) || world.getElement(px, py) !== ElementId.EMPTY) continue;
+
+        if (u.type === 'drone') {
+          // Drone: top rotors flash into fire/steam, chassis shatters into rust, bottom canister drops real SODIUM or THERMITE!
+          if (dy >= 2 && Math.abs(dx) <= 2) {
+            world.setElement(
+              px,
+              py,
+              u.weaponLoadout === 'sodium_bomb' ? ElementId.SODIUM : ElementId.THERMITE,
+              85
+            );
+          } else if (dy <= -2) {
+            world.setElement(px, py, ElementId.FIRE, 780, 12);
+          } else {
+            world.setElement(px, py, ElementId.RUST, 180);
+          }
+        } else if (u.type === 'guard') {
+          // Hazmat Guard: backpack tank ruptures its chemical payload while suit chars into ash & fire!
+          if (dx * u.facing < -1 && Math.abs(dy) <= 2) {
+            const tankEl =
+              u.weaponLoadout === 'acid'
+                ? ElementId.ACID
+                : u.weaponLoadout === 'cryo'
+                  ? ElementId.LIQUID_NITROGEN
+                  : ElementId.OIL;
+            world.setElement(px, py, tankEl, tankEl === ElementId.LIQUID_NITROGEN ? -196 : 60);
+          } else {
+            world.setElement(px, py, (dx + dy) & 1 ? ElementId.CARBON : ElementId.FIRE, 650, 14);
+          }
+        } else {
+          // Heavy Aegis Combat Mech: collapses into a heap of rusted armor plates, thermite core, and molten steel droplets!
+          const mechEl =
+            u.rustedLevel > 25
+              ? ElementId.RUST
+              : Math.abs(dx) <= 2 && Math.abs(dy) <= 2
+                ? ElementId.MOLTEN_STEEL
+                : (dx + dy) & 1
+                  ? ElementId.RUST
+                  : ElementId.FIRE;
+          world.setElement(px, py, mechEl, mechEl === ElementId.MOLTEN_STEEL ? 1600 : 750);
         }
       }
     }
@@ -1249,11 +1286,11 @@ export class JevDirector {
     }
 
     for (const p of projectiles) {
-      if (!p.fromPlayer) continue;
+      if (!p.fromPlayer || p.type === 'kinetic' || p.type === 'implosion') continue;
       const dist = Math.hypot(p.x - u.x, p.y - u.y);
-      if (dist < 42) {
-        u.vy -= Math.sign(p.y - u.y || 1) * 0.65;
-        u.vx -= Math.sign(p.x - u.x || 1) * 0.45;
+      if (dist < 34) {
+        u.vy -= Math.sign(p.y - u.y || 1) * 0.35;
+        u.vx -= Math.sign(p.x - u.x || 1) * 0.25;
         u.aiThought = 'EVADING PROJECTILE!';
         break;
       }
@@ -1261,8 +1298,8 @@ export class JevDirector {
 
     const ax = Math.max(-0.22, Math.min(0.22, (targetX - u.x) * 0.04));
     const ay = Math.max(-0.22, Math.min(0.22, (targetY - u.y) * 0.04));
-    u.vx = Math.max(-2.6, Math.min(2.6, (u.vx + ax) * 0.92));
-    u.vy = Math.max(-2.2, Math.min(2.2, (u.vy + ay) * 0.92));
+    u.vx = Math.max(-3.8, Math.min(3.8, (u.vx + ax) * 0.92));
+    u.vy = Math.max(-3.4, Math.min(3.4, (u.vy + ay) * 0.92));
 
     const nextX = u.x + u.vx;
     const nextY = u.y + u.vy;
@@ -1270,6 +1307,7 @@ export class JevDirector {
     if (!this.checkBoxCollision(nextX, u.y, u.width, u.height, world)) {
       u.x = nextX;
     } else {
+      if (Math.abs(u.vx) > 2.2) u.hp -= 12;
       u.vx = -u.vx * 0.6;
       u.facing = u.facing === 1 ? -1 : 1;
     }
@@ -1277,6 +1315,7 @@ export class JevDirector {
     if (!this.checkBoxCollision(u.x, nextY, u.width, u.height, world)) {
       u.y = nextY;
     } else {
+      if (Math.abs(u.vy) > 2.0) u.hp -= 12;
       u.vy = -u.vy * 0.6;
     }
   }

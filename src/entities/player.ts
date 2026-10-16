@@ -21,6 +21,7 @@ export class Player {
   public submerged: boolean = false;
   public radiationDose: number = 0; // 0..100
   public bodyTemp: number = 37; // Celsius
+  public suitIntegrity: number = 100; // 0..100 physical Hazmat suit ablation layer
 
   public facing: 1 | -1 = 1;
   public grounded: boolean = false;
@@ -42,6 +43,7 @@ export class Player {
       jetpackFuel: this.jetpackFuel, maxJetpack: this.maxJetpack,
       oxygen: this.oxygen, maxOxygen: this.maxOxygen,
       submerged: this.submerged, radiationDose: this.radiationDose, bodyTemp: this.bodyTemp,
+      suitIntegrity: this.suitIntegrity,
       facing: this.facing, grounded: this.grounded,
       carryingBibbi: this.carryingBibbi,
       quantumPhaseTimer: this.quantumPhaseTimer, fireCooldown: this.fireCooldown,
@@ -326,12 +328,15 @@ export class Player {
     const cy = Math.floor(this.y);
     let maxTemp = 22;
     let minTemp = 22;
+    let maxPress = 0;
     let radSum = 0;
     let maxAcidConc = 0;
     let inBioGel = false;
     let inFusion = false;
+    let inFlameOrLava = false;
 
-    for (let dy = -8; dy <= 8; dy += 2) {
+    const maxDy = this.suitIntegrity < 55 ? 10 : 8;
+    for (let dy = -8; dy <= maxDy; dy += 2) {
       for (let dx = -4; dx <= 4; dx += 2) {
         const px = cx + dx;
         const py = cy + dy;
@@ -345,11 +350,21 @@ export class Player {
             : rawT;
         if (t > maxTemp) maxTemp = t;
         if (t < minTemp) minTemp = t;
+        if (world.pressure[i] > maxPress) maxPress = world.pressure[i];
         radSum += world.radiation[i];
 
         if (el === ElementId.ACID) {
           const conc = world.getConcentration(i);
           if (conc > maxAcidConc) maxAcidConc = conc;
+        }
+        if (
+          el === ElementId.FIRE ||
+          el === ElementId.LAVA ||
+          el === ElementId.PLASMA ||
+          el === ElementId.MOLTEN_STEEL ||
+          el === ElementId.BURNING_THERMITE
+        ) {
+          inFlameOrLava = true;
         }
         if (el === ElementId.BIO_GEL) inBioGel = true;
         if (el === ElementId.FUSION_PLASMA) inFusion = true;
@@ -380,15 +395,11 @@ export class Player {
     const onSpaceStation = this.gravityScale < 0.8;
 
     // Level Oxygen (O2) Reserve Depletion:
-    // - Enough O2 (~140 seconds) for a full run through the Space Station
-    // - Depletes faster when submerged underwater or out in hard vacuum
-    // - Does NOT auto-regenerate in normal air (finite level supply), except in oxygenated Bio-Gel vats!
     if (inBioGel) {
       this.oxygen = Math.min(this.maxOxygen, this.oxygen + 0.14);
     } else if (this.submerged || inSpaceVacuum) {
       this.oxygen = Math.max(0, this.oxygen - 0.018);
       if (this.submerged) {
-        // Gentle fluid drag on player movement when submerged
         this.vx *= 0.92;
         this.vy *= 0.94;
       }
@@ -402,19 +413,84 @@ export class Player {
       sound.playGeigerClick();
     }
 
-    this.bodyTemp += ((maxTemp > 60 ? maxTemp : minTemp < 0 ? minTemp : 37) - this.bodyTemp) * 0.05;
+    // Physical Hazmat Suit Ablation ("suit eventually burns/corrodes through"):
+    const prevSuit = this.suitIntegrity;
+    if (inFusion) {
+      this.suitIntegrity = Math.max(0, this.suitIntegrity - 3.5);
+    } else {
+      if (maxAcidConc > 0) {
+        this.suitIntegrity = Math.max(0, this.suitIntegrity - 0.65 * (maxAcidConc / 100));
+      }
+      if (maxTemp > 450) {
+        const thermalAblation =
+          Math.max(0, (maxTemp - 420) * 0.0028) + (inFlameOrLava ? 0.85 : 0);
+        this.suitIntegrity = Math.max(0, this.suitIntegrity - Math.min(2.4, thermalAblation));
+      }
+      if (minTemp < -130) {
+        this.suitIntegrity = Math.max(0, this.suitIntegrity - 0.18);
+      }
+      if (maxPress > 50) {
+        this.suitIntegrity = Math.max(0, this.suitIntegrity - (maxPress - 45) * 0.025);
+        this.vy -= Math.min(1.6, maxPress * 0.006);
+      }
+    }
+
+    // Shed physical charred CARBON or SMOKE pixels into the world when the Hazmat suit is actively burning/corroding!
+    if (prevSuit - this.suitIntegrity > 0.25 && this.suitIntegrity > 0 && ((world.tickCount & 3) === 0)) {
+      const shedX = cx - this.facing * 3;
+      const shedY = cy - 2;
+      if (world.inBounds(shedX, shedY) && world.getElement(shedX, shedY) === ElementId.EMPTY) {
+        world.setElement(
+          shedX,
+          shedY,
+          inFlameOrLava ? ElementId.CARBON : ElementId.SMOKE,
+          Math.min(320, maxTemp),
+          28
+        );
+      }
+    }
+
+    // Exposed skin ratio (0.0 when suit >= 55% intact, scaling to 1.0 as suit burns down to 0%)
+    const skinExposure = Math.max(0, (55 - this.suitIntegrity) / 55);
+    const tempTransfer = 0.04 + skinExposure * 0.12;
+    this.bodyTemp +=
+      ((maxTemp > 55 ? maxTemp : minTemp < 5 ? minTemp : 37) - this.bodyTemp) * tempTransfer;
 
     if (inFusion) {
       this.hp = Math.max(0, this.hp - 1.8);
-    } else if (maxAcidConc > 0) {
-      this.hp = Math.max(0, this.hp - 0.22 * (maxAcidConc / 100));
-      sound.playSizzle();
-    } else if (maxTemp > 450) {
-      this.hp = Math.max(0, this.hp - 0.18);
+    } else {
+      if (maxAcidConc > 0) {
+        // Intact suit buffers acid; once suit burns/corrodes through, exposed skin takes severe caustic burns
+        const acidMult = 0.14 + skinExposure * 0.24;
+        this.hp = Math.max(0, this.hp - acidMult * (maxAcidConc / 100));
+        sound.playSizzle();
+      }
+      if (maxTemp > 450) {
+        const burnDmg = 0.14 + skinExposure * 0.26;
+        this.hp = Math.max(0, this.hp - burnDmg);
+      } else if (skinExposure > 0 && maxTemp > 95) {
+        // Exposed skin burns even in boiling water, steam, hot rock, or embers (>95°C)!
+        const exposedBurn = (0.08 + skinExposure * 0.22) * Math.min(2.2, (maxTemp - 85) / 220);
+        this.hp = Math.max(0, this.hp - exposedBurn);
+      }
+
+      if (skinExposure > 0 && minTemp < -5) {
+        // Exposed skin freezes in ice, snow, liquid nitrogen, or cryogenic gas (<-5°C)!
+        const frostDmg = (0.07 + skinExposure * 0.22) * Math.min(2.2, (-minTemp) / 75);
+        this.hp = Math.max(0, this.hp - frostDmg);
+        this.vx *= 0.88;
+      } else if (minTemp < -150) {
+        this.hp = Math.max(0, this.hp - 0.06);
+      }
+
+      if (maxPress > 60) {
+        this.hp = Math.max(0, this.hp - (maxPress - 55) * (0.025 + skinExposure * 0.035));
+      }
     }
 
     if (radSum > 2.0) {
-      this.radiationDose = Math.min(100, this.radiationDose + radSum * 0.012);
+      const radMult = 0.01 + skinExposure * 0.008;
+      this.radiationDose = Math.min(100, this.radiationDose + radSum * radMult);
       sound.playGeigerClick();
       if (this.radiationDose > 60) {
         this.hp = Math.max(0, this.hp - 0.12);
@@ -425,10 +501,19 @@ export class Player {
 
     if (inBioGel) {
       this.hp = Math.min(this.maxHp, this.hp + 0.6);
+      this.suitIntegrity = Math.min(100, this.suitIntegrity + 1.2);
       this.radiationDose = Math.max(0, this.radiationDose - 0.8);
-    } else if (maxAcidConc === 0 && maxTemp <= 150 && radSum <= 1.0 && this.hp > 0 && (this.oxygen > 0 || (!this.submerged && !onSpaceStation))) {
+    } else if (
+      maxAcidConc === 0 &&
+      maxTemp <= 150 &&
+      minTemp >= -5 &&
+      radSum <= 1.0 &&
+      this.hp > 0 &&
+      (this.oxygen > 0 || (!this.submerged && !onSpaceStation))
+    ) {
       // Slow suit self-repair nano-gel
       this.hp = Math.min(this.maxHp, this.hp + 0.03);
+      this.suitIntegrity = Math.min(100, this.suitIntegrity + 0.045);
     }
   }
 

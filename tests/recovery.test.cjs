@@ -437,3 +437,121 @@ test('lava thermal mass keeps a wide lava mound hot in air while leveling flat, 
   assert.ok(res.quenchedStone >= 80, `Expected water to quench lava surface into basalt stone, got ${JSON.stringify(res)}`);
 });
 
+test('hazmat suit eventually burns through to expose skin to freezing/burning, and pressure projectiles damage and disintegrate drones into physical pixels', () => {
+  const game = createGame();
+  game.arena();
+
+  const res = game.run(`(() => {
+    const { ElementId } = require("./chemistry/elements");
+    const { updateProjectiles } = require("./entities/tools");
+
+    // 1. Intact suit (100%) protects against -35C ice floor
+    for (let x = 80; x <= 120; x++) {
+      for (let y = 206; y <= 214; y++) {
+        world.setElement(x, y, ElementId.ICE, -35);
+      }
+    }
+    player.x = 100;
+    player.y = 198;
+    player.hp = 100;
+    player.suitIntegrity = 100;
+    for (let t = 0; t < 20; t++) {
+      player.update(keys, world, sound);
+    }
+    const hpIntactInCold = player.hp;
+
+    // 2. Burn through the Hazmat suit with intense fire/heat
+    for (let dy = -4; dy <= 4; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
+        world.setElement(100 + dx, 198 + dy, ElementId.FIRE, 950, 40);
+      }
+    }
+    for (let t = 0; t < 35; t++) {
+      player.update(keys, world, sound);
+    }
+    const suitAfterFire = player.suitIntegrity;
+
+    // 3. Now place player with burned-through suit onto -35C ICE: exposed skin freezes!
+    for (let dy = -6; dy <= 6; dy++) {
+      for (let dx = -4; dx <= 4; dx++) {
+        world.setElement(100 + dx, 198 + dy, ElementId.EMPTY, -35);
+      }
+    }
+    for (let x = 80; x <= 120; x++) {
+      for (let y = 204; y <= 214; y++) {
+        world.setElement(x, y, ElementId.ICE, -35);
+      }
+    }
+    player.hp = 80;
+    const hpBeforeFreeze = player.hp;
+    for (let t = 0; t < 20; t++) {
+      player.update(keys, world, sound);
+    }
+    const hpAfterExposedFreeze = player.hp;
+
+    // 4. Spawn a Hunter-Seeker Drone and fire Graviton Pressure Cannon at it
+    const drone = {
+      id: "test-drone",
+      type: "drone",
+      name: "Hunter-Seeker Drone",
+      x: 160,
+      y: 195,
+      vx: 0,
+      vy: 0,
+      width: 12,
+      height: 10,
+      hp: 50,
+      maxHp: 75,
+      facing: -1,
+      grounded: false,
+      active: true,
+      cooldown: 50,
+      patrolMinX: 120,
+      patrolMaxX: 220,
+      homeY: 195,
+      wetTimer: 0,
+      rustedLevel: 0,
+      cryoBrittleTimer: 0,
+      stasisTimer: 0,
+      aiState: "patrol",
+      aiThought: "PATROL",
+      weaponLoadout: "sodium_bomb",
+    };
+    level.enemyUnits = [drone];
+    player.selectedTool = 1; // Graviton Pressure Cannon
+    player.fireCooldown = 0;
+    player.fireTool(160, 195, true, projectiles, world, sound); // Secondary implosion shot
+    for (let t = 0; t < 15; t++) {
+      updateProjectiles(projectiles, world, sound, player, level.enemyUnits, level.bibbi);
+      jevDirector.update(world, player, level.enemyUnits, level.defenses, projectiles, level.bibbi, sound, t);
+    }
+
+    let physicalDebrisPixels = 0;
+    for (let y = 180; y <= 210; y++) {
+      for (let x = 145; x <= 180; x++) {
+        const el = world.getElement(x, y);
+        if (el === ElementId.RUST || el === ElementId.SODIUM || el === ElementId.FIRE) {
+          physicalDebrisPixels++;
+        }
+      }
+    }
+
+    return {
+      hpIntactInCold,
+      suitAfterFire,
+      hpBeforeFreeze,
+      hpAfterExposedFreeze,
+      droneHp: drone.hp,
+      droneActive: drone.active,
+      physicalDebrisPixels,
+    };
+  })()`);
+
+  assert.equal(res.hpIntactInCold, 100, `Expected intact Hazmat suit to block -35C cold damage, got ${JSON.stringify(res)}`);
+  assert.ok(res.suitAfterFire < 45, `Expected fire exposure to burn through Hazmat suit (<45%), got ${JSON.stringify(res)}`);
+  assert.ok(res.hpAfterExposedFreeze < res.hpBeforeFreeze, `Expected exposed skin to take freezing damage at -35C, got ${JSON.stringify(res)}`);
+  assert.ok(!res.droneActive && res.droneHp <= 0, `Expected pressure projectile to damage and destroy drone, got ${JSON.stringify(res)}`);
+  assert.ok(res.physicalDebrisPixels > 5, `Expected destroyed drone to materialize into physical world pixels (rust/sodium/fire), got ${JSON.stringify(res)}`);
+});
+
+

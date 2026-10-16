@@ -1142,6 +1142,21 @@ export class WorldRenderer {
     ctx.fillRect(px + 1.4 * ux, py + (6.2 - legSwing * 0.4) * uy, 1.8 * ux, 3.2 * uy);
 
     // 16-bit Pixel Art Dr. Vance Body, Domed Helmet, Cyan Visor & Pressurized Tank
+    // Suit chars as suitIntegrity drops; below 55%, torn patches expose skin (which burns red or freezes cyan!)
+    const suitInt = player.suitIntegrity;
+    const exposedSkinColor =
+      player.bodyTemp > 42
+        ? '#ff4d6d'
+        : player.bodyTemp < 31
+          ? '#90e0ef'
+          : '#e8b49a';
+    const suitMainColor =
+      suitInt > 70 ? '#ffd166' : suitInt > 35 ? '#c98a3b' : '#5c4033';
+    const suitSubColor =
+      suitInt > 55 ? '#f4a261' : exposedSkinColor;
+    const patchColor =
+      suitInt > 30 ? '#80ed99' : exposedSkinColor;
+
     drawCompiledSprite(
       ctx,
       SPRITE_PLAYER_BODY,
@@ -1151,8 +1166,8 @@ export class WorldRenderer {
       uy,
       {
         O: '#141824',
-        W: '#f8f9fa',
-        w: '#ced4da',
+        W: suitInt > 25 ? '#f8f9fa' : '#adb5bd',
+        w: suitInt > 40 ? '#ced4da' : exposedSkinColor,
         o: '#495057',
         C: '#00f5d4',
         V: '#a8f9ff',
@@ -1161,15 +1176,25 @@ export class WorldRenderer {
         B: '#48cae4',
         b: '#0077b6',
         h: '#0096c7',
-        Y: '#ffd166',
-        y: '#f4a261',
-        P: '#80ed99',
+        Y: suitMainColor,
+        y: suitSubColor,
+        P: patchColor,
         G: '#2b2d42',
         D: '#2b2d42',
         U: '#ffd166',
       },
       flip
     );
+
+    // Compact Hazmat Suit Integrity micro-bar above Dr. Vance when suit is ablated (< 98%)
+    if (suitInt < 98) {
+      const sBarW = 5.4 * ex;
+      const sBarY = py - 5.9 * ey;
+      ctx.fillStyle = 'rgba(10, 14, 24, 0.85)';
+      ctx.fillRect(px - sBarW / 2, sBarY, sBarW, 0.8 * ey);
+      ctx.fillStyle = suitInt < 50 ? '#ff595e' : '#ffd166';
+      ctx.fillRect(px - sBarW / 2, sBarY, sBarW * Math.max(0, suitInt / 100), 0.8 * ey);
+    }
 
     // If Bibbi is riding piggyback on Dr. Vance's back (drawn over his backpack/shoulders!)
     const b = level.bibbi;

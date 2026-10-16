@@ -176,16 +176,18 @@ export function updateProjectiles(
         break;
       }
 
-      // 1. Check direct impact on J.E.V. Enemy Units (Guards, Drones, Heavy Robots)
+      // 1. Check direct or pressure-shockwave impact on J.E.V. Enemy Units (Guards, Drones, Heavy Robots)
       if (p.fromPlayer && enemyUnits) {
+        const isPressureShot = p.type === 'kinetic' || p.type === 'implosion';
+        const shockMargin = isPressureShot ? p.radius * 0.45 : 0;
         for (const u of enemyUnits) {
           if (!u.active) continue;
           if (
-            Math.abs(p.x - u.x) <= u.width * 0.65 &&
-            Math.abs(p.y - u.y) <= u.height * 0.65
+            Math.abs(p.x - u.x) <= u.width * 0.82 + shockMargin &&
+            Math.abs(p.y - u.y) <= u.height * 0.82 + shockMargin
           ) {
             handleDirectEnemyHit(p, u, gx, gy, world, sound);
-            this_handleProjectileImpact(p, gx, gy, world, sound, bibbi);
+            this_handleProjectileImpact(p, gx, gy, world, sound, bibbi, player);
             hit = true;
             break;
           }
@@ -220,7 +222,7 @@ export function updateProjectiles(
               ? 'Struck directly by your own weapon!'
               : 'Hit by J.E.V. crossfire!';
             sound.playCombatHit(true, false);
-            this_handleProjectileImpact(p, gx, gy, world, sound, bibbi);
+            this_handleProjectileImpact(p, gx, gy, world, sound, bibbi, player);
             hit = true;
             break;
           }
@@ -233,15 +235,22 @@ export function updateProjectiles(
           Math.abs(p.x - player.x) <= player.width * 0.6 &&
           Math.abs(p.y - player.y) <= player.height * 0.6
         ) {
+          const skinExp = Math.max(0, (55 - player.suitIntegrity) / 55);
+          const dmgMult = 1.0 + skinExp * 0.65;
           if (p.type === 'cryo') {
-            player.hp = Math.max(0, player.hp - 4.5);
+            player.suitIntegrity = Math.max(0, player.suitIntegrity - 6);
+            player.hp = Math.max(0, player.hp - 4.5 * dmgMult);
+            player.bodyTemp = Math.max(-40, player.bodyTemp - (8 + skinExp * 18));
             player.vx *= 0.3;
           } else if (p.type === 'kinetic') {
-            player.hp = Math.max(0, player.hp - 8.5);
+            player.suitIntegrity = Math.max(0, player.suitIntegrity - 9);
+            player.hp = Math.max(0, player.hp - 8.5 * dmgMult);
             player.vx += Math.sign(p.vx) * 2.4;
             player.vy -= 1.5;
           } else {
-            player.hp = Math.max(0, player.hp - 5.5);
+            player.suitIntegrity = Math.max(0, player.suitIntegrity - 8);
+            player.hp = Math.max(0, player.hp - 5.5 * dmgMult);
+            player.bodyTemp = Math.min(120, player.bodyTemp + (6 + skinExp * 14));
           }
           // If Bibbi is riding on the player's back, enemy hits also hurt delicate Bibbi!
           if (bibbi && bibbi.carried && !bibbi.rescued && bibbi.hp > 0) {
@@ -250,7 +259,7 @@ export function updateProjectiles(
             bibbi.hurtReason = 'Hit by enemy fire while riding on your back!';
           }
           sound.playCombatHit(true, false);
-          this_handleProjectileImpact(p, gx, gy, world, sound, bibbi);
+          this_handleProjectileImpact(p, gx, gy, world, sound, bibbi, player);
           hit = true;
           break;
         }
@@ -378,11 +387,27 @@ function handleDirectEnemyHit(
   switch (p.type) {
     case 'kinetic':
     case 'implosion': {
-      const mult = u.cryoBrittleTimer > 0 ? 3.2 : 1.0;
-      const baseDmg = p.type === 'implosion' ? 48 : 26;
+      const mult = (u.cryoBrittleTimer > 0 ? 3.2 : 1.0) * (u.type === 'drone' ? 1.35 : 1.0);
+      const baseDmg = p.type === 'implosion' ? 52 : 30;
       u.hp -= baseDmg * mult;
-      u.vx += Math.sign(p.vx) * (u.type === 'robot' ? 1.4 : 2.8);
-      u.vy -= 1.4;
+      u.vx += Math.sign(p.vx || 1) * (u.type === 'robot' ? 1.5 : u.type === 'drone' ? 3.8 : 2.8);
+      u.vy += u.type === 'drone' ? Math.sign(p.vy || 1) * 2.4 : -1.4;
+      // Chip physical armor/payload pixels off the unit into the world grid!
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const sx = gx + dx;
+          const sy = gy + dy;
+          if (world.inBounds(sx, sy) && world.getElement(sx, sy) === ElementId.EMPTY && (dx === 0 || dy === 0)) {
+            const chipEl =
+              u.type === 'drone' && u.weaponLoadout === 'sodium_bomb' && dy > 0
+                ? ElementId.SODIUM
+                : u.type === 'guard'
+                  ? ElementId.CARBON
+                  : ElementId.RUST;
+            world.setElement(sx, sy, chipEl, 120);
+          }
+        }
+      }
       break;
     }
     case 'cryo':
@@ -390,7 +415,10 @@ function handleDirectEnemyHit(
       u.hp -= 6;
       break;
     case 'heat':
-      u.hp -= 4.5;
+      u.hp -= 5.2;
+      if (world.inBounds(gx, gy) && world.getElement(gx, gy) === ElementId.EMPTY) {
+        world.setElement(gx, gy, ElementId.CARBON, 420);
+      }
       break;
     case 'time_accel':
       if (u.wetTimer > 0 || u.type === 'robot') {
