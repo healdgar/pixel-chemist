@@ -137,7 +137,8 @@ export class WorldGrid {
     switch (el) {
       case ElementId.ACID:
       case ElementId.ALKALI:
-        return 100; // 100% molar concentration for aqueous acids & bases
+      case ElementId.SALT_WATER:
+        return 100; // 100% molar concentration / saturation for aqueous solutions
       case ElementId.FIRE:
         return 28 + ((this.rngState >>> 4) & 31);
       case ElementId.SMOKE:
@@ -163,10 +164,14 @@ export class WorldGrid {
     }
   }
 
-  // Returns 1..100 molar concentration for ACID / ALKALI pixels (defaults to 100 if unset)
+  // Returns 1..100 molar concentration for ACID / ALKALI / SALT_WATER pixels (defaults to 100 if unset)
   public getConcentration(i: number): number {
     const c = this.life[i];
     return c > 0 ? (c > 100 ? 100 : c) : 100;
+  }
+
+  public isAqueousSolution(el: ElementId): boolean {
+    return el === ElementId.ACID || el === ElementId.ALKALI || el === ElementId.SALT_WATER;
   }
 
   private isMiscibleAqueous(el: ElementId): boolean {
@@ -514,8 +519,9 @@ export class WorldGrid {
   ): void {
     const def = ELEMENTS[el];
 
-    // For ACID and ALKALI, this.life[i] stores molar concentration (1..100%), not a countdown timer!
-    if (this.life[i] > 0 && el !== ElementId.ACID && el !== ElementId.ALKALI) {
+    // For ACID, ALKALI, and SALT_WATER, this.life[i] stores molar concentration / saturation (1..100%), not a countdown timer!
+    const isSolution = this.isAqueousSolution(el);
+    if (this.life[i] > 0 && !isSolution) {
       this.life[i]--;
       if (this.life[i] === 0) {
         if (el === ElementId.FIRE) {
@@ -573,14 +579,36 @@ export class WorldGrid {
         this.pressure[ni] += dp;
       }
 
-      // 2b. Fick's Law Solute Concentration Diffusion within Acid or Alkali solutions
-      if (nel === el && (el === ElementId.ACID || el === ElementId.ALKALI)) {
-        const c1 = this.getConcentration(i);
-        const c2 = this.getConcentration(ni);
-        if (Math.abs(c1 - c2) >= 2) {
-          const avg = (c1 + c2) >> 1;
-          this.life[i] = avg;
-          this.life[ni] = c1 + c2 - avg;
+      // 2b. Fick's Law Solute Concentration Diffusion across the entire connected body of solution
+      if (isSolution) {
+        if (nel === el) {
+          const c1 = this.getConcentration(i);
+          const c2 = this.getConcentration(ni);
+          const diff = c1 - c2;
+          if (diff >= 2 || diff <= -2) {
+            const avg = (c1 + c2) >> 1;
+            this.life[i] = avg;
+            this.life[ni] = c1 + c2 - avg;
+          } else if ((diff === 1 || diff === -1) && this.fastCoin()) {
+            this.life[i] = c2;
+            this.life[ni] = c1;
+          }
+        }
+        // Second orthogonal sample so a pool homogenizes its concentration and color rapidly across the whole body
+        const dIdx2 = (dIdx + 1) & 3;
+        const nx2 = x + (dIdx2 === 2 ? -1 : dIdx2 === 3 ? 1 : 0);
+        const ny2 = y + (dIdx2 === 0 ? -1 : dIdx2 === 1 ? 1 : 0);
+        if (nx2 > 1 && nx2 < this.width - 2 && ny2 > 1 && ny2 < this.height - 2) {
+          const ni2 = ny2 * this.width + nx2;
+          if ((this.grid[ni2] as ElementId) === el) {
+            const c1 = this.getConcentration(i);
+            const c2 = this.getConcentration(ni2);
+            if (Math.abs(c1 - c2) >= 2) {
+              const avg = (c1 + c2) >> 1;
+              this.life[i] = avg;
+              this.life[ni2] = c1 + c2 - avg;
+            }
+          }
         }
       }
 
@@ -623,7 +651,7 @@ export class WorldGrid {
       this.flags[i] &= ~FLAG_CRYO_BRITTLE;
     }
 
-    // 7. Phase Transitions (Melting / Boiling / Freezing)
+    // 7. Phase Transitions (Melting / Colligative Boiling Point Elevation / Colligative Freezing Point Depression)
     const curTemp = this.temp[i];
     if (el === ElementId.NITROGEN_GAS && curTemp >= -35) {
       // Cold nitrogen vapor warms into ambient room air (78% N2) without a violent boil pressure spike
@@ -638,19 +666,43 @@ export class WorldGrid {
       }
       return;
     }
-    if (def.boilPoint !== undefined && curTemp >= def.boilPoint && def.boilInto !== undefined) {
-      // Boiling Brine (Salt Water) precipitates crystalline Salt behind as Steam evaporates!
-      if (el === ElementId.SALT_WATER && this.fastRand() < 0.25) {
-        this.setElement(x, y, ElementId.SALT, curTemp);
-      } else {
-        this.setElement(x, y, def.boilInto, curTemp);
+    if (def.boilPoint !== undefined && def.boilInto !== undefined) {
+      // Colligative boiling point elevation: aqueous solutions interpolate between Water (100°C) and 100% solute boilPoint
+      const concFactor = isSolution ? this.getConcentration(i) / 100 : 1;
+      const effBoilPoint = isSolution ? 100 + (def.boilPoint - 100) * concFactor : def.boilPoint;
+      if (curTemp >= effBoilPoint) {
+        if (isSolution) {
+          const conc = this.getConcentration(i);
+          // Evaporating solvent concentrates adjacent solution pixels (fractional distillation)
+          let transferred = false;
+          if (conc < 90 && y < this.height - 2) {
+            const bi = (y + 1) * this.width + x;
+            if ((this.grid[bi] as ElementId) === el && this.getConcentration(bi) < 100) {
+              this.life[bi] = Math.min(100, this.getConcentration(bi) + conc);
+              transferred = true;
+            }
+          }
+          if (!transferred && el === ElementId.SALT_WATER && this.fastRand() < 0.35 * concFactor) {
+            // Boiling Brine precipitates crystalline Salt behind as Steam evaporates!
+            this.setElement(x, y, ElementId.SALT, curTemp);
+          } else {
+            this.setElement(x, y, transferred ? ElementId.STEAM : def.boilInto, curTemp);
+          }
+        } else {
+          this.setElement(x, y, def.boilInto, curTemp);
+        }
+        this.pressure[i] += 18;
+        return;
       }
-      this.pressure[i] += 18;
-      return;
     }
-    if (def.freezePoint !== undefined && curTemp <= def.freezePoint && def.freezeInto !== undefined) {
-      this.setElement(x, y, def.freezeInto, curTemp);
-      return;
+    if (def.freezePoint !== undefined && def.freezeInto !== undefined) {
+      // Colligative freezing point depression: dissolved solute lowers freezing point from 0°C down to def.freezePoint
+      const concFactor = isSolution ? this.getConcentration(i) / 100 : 1;
+      const effFreezePoint = isSolution ? def.freezePoint * concFactor : def.freezePoint;
+      if (curTemp <= effFreezePoint) {
+        this.setElement(x, y, def.freezeInto, curTemp);
+        return;
+      }
     }
 
     // 8. Unanchored mid-air Ice crystals (e.g., frozen steam/mist droplets) fall under gravity instead of floating
@@ -704,83 +756,115 @@ export class WorldGrid {
     ) {
       const c1 = this.getConcentration(i);
       const c2 = this.getConcentration(ni);
-      const reactionTemp = Math.min(115, Math.max(this.temp[i], this.temp[ni]) + (c1 + c2) * 0.18);
-      if (c1 > c2 + 25) {
+      const neutralized = Math.min(c1, c2);
+      const reactionTemp = Math.min(115, Math.max(this.temp[i], this.temp[ni]) + neutralized * 0.36);
+      if (c1 > c2 + 8) {
         // Excess strong acid/base partially neutralizes and stays active at reduced molarity
         this.life[i] = c1 - c2;
         this.temp[i] = reactionTemp;
-        this.setElement(nx, ny, ElementId.SALT_WATER, reactionTemp);
-      } else if (c2 > c1 + 25) {
+        this.setElement(nx, ny, ElementId.SALT_WATER, reactionTemp, neutralized);
+      } else if (c2 > c1 + 8) {
         this.life[ni] = c2 - c1;
         this.temp[ni] = reactionTemp;
-        this.setElement(x, y, ElementId.SALT_WATER, reactionTemp);
+        this.setElement(x, y, ElementId.SALT_WATER, reactionTemp, neutralized);
       } else {
-        this.setElement(x, y, ElementId.SALT_WATER, reactionTemp);
-        this.setElement(nx, ny, this.fastRand() < 0.3 ? ElementId.STEAM : ElementId.SALT_WATER, reactionTemp + 10);
+        this.setElement(x, y, ElementId.SALT_WATER, reactionTemp, neutralized);
+        this.setElement(
+          nx,
+          ny,
+          reactionTemp > 95 && this.fastRand() < 0.3 ? ElementId.STEAM : ElementId.SALT_WATER,
+          reactionTemp + 10,
+          neutralized
+        );
       }
       this.addReactionPopup(x, y, 'H₂SO₄ + 2NaOH → Salt Water (Neutralized!)', '#a8dadc');
       sound.playSizzle();
       return;
     }
 
-    // B2. AQUEOUS DILUTION: WATER / BRINE mixes with ACID or ALKALI and dilutes its molar concentration!
-    const elIsSolute = el === ElementId.ACID || el === ElementId.ALKALI;
-    const nelIsSolute = nel === ElementId.ACID || nel === ElementId.ALKALI;
-    const elIsWater = el === ElementId.WATER || el === ElementId.SALT_WATER || el === ElementId.HEAVY_WATER;
-    const nelIsWater = nel === ElementId.WATER || nel === ElementId.SALT_WATER || nel === ElementId.HEAVY_WATER;
+    // B2. AQUEOUS DILUTION & ADMIXTURE: WATER mixes with ACID, ALKALI, or SALT_WATER conserving solute across the body!
+    const elIsStrongSolute = el === ElementId.ACID || el === ElementId.ALKALI;
+    const nelIsStrongSolute = nel === ElementId.ACID || nel === ElementId.ALKALI;
+    const elIsPureWater = el === ElementId.WATER || el === ElementId.HEAVY_WATER;
+    const nelIsPureWater = nel === ElementId.WATER || nel === ElementId.HEAVY_WATER;
 
-    if ((elIsSolute && nelIsWater) || (nelIsSolute && elIsWater)) {
-      const solIdx = elIsSolute ? i : ni;
-      const solX = elIsSolute ? x : nx;
-      const solY = elIsSolute ? y : ny;
-      const solEl = (elIsSolute ? el : nel) as ElementId;
-      const watIdx = elIsSolute ? ni : i;
-      const watX = elIsSolute ? nx : x;
-      const watY = elIsSolute ? ny : y;
-      const watEl = (elIsSolute ? nel : el) as ElementId;
+    // Case 1: ACID, ALKALI, or SALT_WATER meets pure WATER / HEAVY_WATER -> conserve solute across both pixels
+    const elIsAnySol = this.isAqueousSolution(el);
+    const nelIsAnySol = this.isAqueousSolution(nel);
+    if ((elIsAnySol && nelIsPureWater) || (nelIsAnySol && elIsPureWater)) {
+      const solIdx = elIsAnySol ? i : ni;
+      const solX = elIsAnySol ? x : nx;
+      const solY = elIsAnySol ? y : ny;
+      const solEl = (elIsAnySol ? el : nel) as ElementId;
+      const watIdx = elIsAnySol ? ni : i;
+      const watX = elIsAnySol ? nx : x;
+      const watY = elIsAnySol ? ny : y;
+      const watEl = (elIsAnySol ? nel : el) as ElementId;
 
       const c = this.getConcentration(solIdx);
-      const avgTemp = (this.temp[i] + this.temp[ni]) * 0.5 + (c > 60 ? 1.5 : 0.2);
+      const heatOfDilution = solEl !== ElementId.SALT_WATER && c > 50 ? (c - 50) * 0.025 : 0;
+      const avgTemp = (this.temp[i] + this.temp[ni]) * 0.5 + heatOfDilution;
 
-      if (c <= 28) {
-        // Weak acid/base is completely diluted into harmless Water / Salt Water!
-        const finalLiquid = solEl === ElementId.ALKALI ? ElementId.SALT_WATER : watEl;
-        this.setElement(solX, solY, finalLiquid, avgTemp);
+      if (c >= 2) {
+        // Exact solute conservation: split concentration across both pixels so the entire pool equilibrates!
+        const c1 = c >> 1;
+        const c2 = c - c1;
+        this.life[solIdx] = c1;
+        this.temp[solIdx] = avgTemp;
+        this.setElement(watX, watY, solEl, avgTemp, c2);
+      } else if (this.fastRand() < 0.15) {
+        // Trace < 1% solute in excessive water becomes pure water
+        this.setElement(solX, solY, watEl, avgTemp);
         this.temp[watIdx] = avgTemp;
-      } else {
-        // Mix water into the acid/base: share and reduce concentration across both pixels
-        const sharedConc = Math.floor(c * 0.44);
-        if (sharedConc < 20) {
-          // One pixel becomes pure water/brine while the other holds the remaining dilute solute
-          this.life[solIdx] = Math.max(18, Math.floor(c * 0.58));
-          this.temp[solIdx] = avgTemp;
-          this.temp[watIdx] = avgTemp;
-          if (this.fastCoin()) {
-            this.swap(solIdx, watIdx);
-          }
-        } else {
-          this.life[solIdx] = sharedConc;
-          this.temp[solIdx] = avgTemp;
-          this.setElement(watX, watY, solEl, avgTemp, sharedConc);
-        }
       }
       return;
     }
 
-    // B3. SOLUTE DISSOLUTION: Crystalline SALT (NaCl) dissolves in WATER -> SALT_WATER (NaCl(aq))!
+    // Case 2: ACID or ALKALI meets SALT_WATER -> dilute acid/alkali across the brine
     if (
-      (el === ElementId.SALT && nel === ElementId.WATER) ||
-      (el === ElementId.WATER && nel === ElementId.SALT)
+      (elIsStrongSolute && nel === ElementId.SALT_WATER) ||
+      (nelIsStrongSolute && el === ElementId.SALT_WATER)
     ) {
-      const isTimeAccel = (this.flags[i] & FLAG_TIME_ACCEL) !== 0 || (this.flags[ni] & FLAG_TIME_ACCEL) !== 0;
-      if (this.fastRand() < (isTimeAccel ? 0.65 : 0.12)) {
-        const saltX = el === ElementId.SALT ? x : nx;
-        const saltY = el === ElementId.SALT ? y : ny;
-        const watX = el === ElementId.WATER ? x : nx;
-        const watY = el === ElementId.WATER ? y : ny;
-        this.setElement(watX, watY, ElementId.SALT_WATER, this.temp[i]);
-        this.setElement(saltX, saltY, ElementId.EMPTY, this.temp[i]);
-        return;
+      const solIdx = elIsStrongSolute ? i : ni;
+      const solEl = (elIsStrongSolute ? el : nel) as ElementId;
+      const brineX = elIsStrongSolute ? nx : x;
+      const brineY = elIsStrongSolute ? ny : y;
+      const c = this.getConcentration(solIdx);
+      const avgTemp = (this.temp[i] + this.temp[ni]) * 0.5 + (c > 50 ? 0.5 : 0);
+      if (c >= 2) {
+        const c1 = c >> 1;
+        const c2 = c - c1;
+        this.life[solIdx] = c1;
+        this.temp[solIdx] = avgTemp;
+        this.setElement(brineX, brineY, solEl, avgTemp, c2);
+      }
+      return;
+    }
+
+    // B3. SOLUTE DISSOLUTION & SATURATION: Crystalline SALT (NaCl) dissolves in WATER or unsaturated SALT_WATER!
+    if (
+      (el === ElementId.SALT && (nel === ElementId.WATER || nel === ElementId.SALT_WATER)) ||
+      ((el === ElementId.WATER || el === ElementId.SALT_WATER) && nel === ElementId.SALT)
+    ) {
+      const saltX = el === ElementId.SALT ? x : nx;
+      const saltY = el === ElementId.SALT ? y : ny;
+      const liqIdx = el === ElementId.SALT ? ni : i;
+      const liqX = el === ElementId.SALT ? nx : x;
+      const liqY = el === ElementId.SALT ? ny : y;
+      const liqEl = (el === ElementId.SALT ? nel : el) as ElementId;
+      const curSalinity = liqEl === ElementId.SALT_WATER ? this.getConcentration(liqIdx) : 0;
+
+      // Solubility limit: saturated brine (>= 88%) cannot dissolve additional solid salt at ambient temperature
+      const maxSolubility = this.temp[liqIdx] > 60 ? 98 : 88;
+      if (curSalinity < maxSolubility) {
+        const isTimeAccel = (this.flags[i] & FLAG_TIME_ACCEL) !== 0 || (this.flags[ni] & FLAG_TIME_ACCEL) !== 0;
+        const dissolveRate = (isTimeAccel ? 0.65 : 0.16) * (1 - curSalinity / 110);
+        if (this.fastRand() < dissolveRate) {
+          const newSalinity = Math.min(100, curSalinity + 65);
+          this.setElement(liqX, liqY, ElementId.SALT_WATER, this.temp[liqIdx], newSalinity);
+          this.setElement(saltX, saltY, ElementId.EMPTY, this.temp[liqIdx]);
+          return;
+        }
       }
     }
 
@@ -797,9 +881,9 @@ export class WorldGrid {
         const liqEl = el === ElementId.TOXIC_GAS ? nel : el;
         this.setElement(gasX, gasY, ElementId.EMPTY, this.temp[i]);
         if (liqEl === ElementId.ALKALI) {
-          this.setElement(liqX, liqY, ElementId.SALT_WATER, this.temp[i] + 5);
+          this.setElement(liqX, liqY, ElementId.SALT_WATER, this.temp[i] + 5, 75);
         } else {
-          this.setElement(liqX, liqY, ElementId.ACID, this.temp[i] + 2, 32);
+          this.setElement(liqX, liqY, ElementId.ACID, this.temp[i] + 2, 35);
         }
         return;
       }
@@ -810,31 +894,34 @@ export class WorldGrid {
       const ndef = ELEMENTS[nel];
       if (ndef.corrodible && ndef.corrodible > 0 && (this.flags[ni] & FLAG_GLUON_LOCKED) === 0) {
         const conc = this.getConcentration(i);
+        // Very dilute acid (< 12%) cannot corrode hard structural metals (Steel/Concrete/Stone)
+        if (conc < 12 && ndef.state === 'solid' && ndef.corrodible < 0.5) return;
         const concFactor = conc / 100;
         const timeBoost = (this.flags[i] & FLAG_TIME_ACCEL) !== 0 ? 8 : 1;
         if (this.fastRand() < ndef.corrodible * 0.09 * timeBoost * concFactor) {
           this.setElement(nx, ny, this.fastRand() < 0.4 ? ElementId.TOXIC_GAS : ElementId.EMPTY, this.temp[i] + 55 * concFactor);
-          const remConc = conc - 36;
-          if (remConc < 18) {
-            this.setElement(x, y, this.fastRand() < 0.65 ? ElementId.TOXIC_GAS : ElementId.WATER, 85);
+          const remConc = conc - 28;
+          if (remConc < 6) {
+            this.setElement(x, y, this.fastRand() < 0.5 ? ElementId.TOXIC_GAS : ElementId.WATER, 65);
           } else {
             this.life[i] = remConc;
           }
           sound.playSizzle();
-          this.addReactionPopup(x, y, `Acid Dissolving ${ndef.symbol}!`, '#80ed99');
+          this.addReactionPopup(x, y, `Acid (${conc}%) Dissolving ${ndef.symbol}!`, '#80ed99');
           return;
         }
       }
     }
 
-    // D. STEEL + WATER / SALT_WATER / OXYGEN -> RUST (Fe2O3), accelerated massively by Time Beam!
+    // D. STEEL + WATER / SALT_WATER / OXYGEN -> RUST (Fe2O3), accelerated by electrolyte salinity & Time Beam!
     if (
       el === ElementId.STEEL &&
       (nel === ElementId.WATER || nel === ElementId.SALT_WATER || nel === ElementId.STEAM)
     ) {
       const isTimeAccel =
         (this.flags[i] & FLAG_TIME_ACCEL) !== 0 || (this.flags[ni] & FLAG_TIME_ACCEL) !== 0;
-      const rustChance = (nel === ElementId.SALT_WATER ? 0.015 : 0.002) * (isTimeAccel ? 35 : 1);
+      const salinityFactor = nel === ElementId.SALT_WATER ? 0.3 + 0.7 * (this.getConcentration(ni) / 100) : 1;
+      const rustChance = (nel === ElementId.SALT_WATER ? 0.016 * salinityFactor : 0.002) * (isTimeAccel ? 35 : 1);
       if (this.fastRand() < rustChance) {
         this.setElement(x, y, ElementId.RUST, this.temp[i] + 10);
         this.addReactionPopup(x, y, '4Fe + 3O₂ → 2Fe₂O₃ (Rusted!)', '#e07a5f');
@@ -908,7 +995,7 @@ export class WorldGrid {
   }
 
   private getEffectiveDensity(idx: number, el: ElementId, def: (typeof ELEMENTS)[ElementId]): number {
-    if (el === ElementId.ACID || el === ElementId.ALKALI) {
+    if (this.isAqueousSolution(el)) {
       const c = this.getConcentration(idx) / 100;
       return 1000 + (def.density - 1000) * c;
     }
@@ -981,6 +1068,7 @@ export class WorldGrid {
       }
       const hDir = this.fastCoin() ? -1 : 1;
       const isMiscible = this.isMiscibleAqueous(el);
+      const isSol = this.isAqueousSolution(el);
       for (let step = 1; step <= 4; step++) {
         const hx = x + hDir * step;
         if (hx <= 1 || hx >= this.width - 2) break;
@@ -989,6 +1077,15 @@ export class WorldGrid {
         if (this.canDisplace(i, effDensity, hi)) {
           this.swap(i, hi);
           return;
+        } else if (isSol && targetEl === el) {
+          // Long-range horizontal eddy mixing equalizes concentration across the width of a solution pool
+          const c1 = this.getConcentration(i);
+          const c2 = this.getConcentration(hi);
+          if (Math.abs(c1 - c2) >= 2) {
+            const avg = (c1 + c2) >> 1;
+            this.life[i] = avg;
+            this.life[hi] = c1 + c2 - avg;
+          }
         } else if (isMiscible && targetEl !== el && this.isMiscibleAqueous(targetEl)) {
           // Miscible aqueous solutions interdiffuse horizontally instead of blocking each other
           if (this.fastRand() < 0.28) {
@@ -1069,6 +1166,9 @@ export class WorldGrid {
         return true;
       }
       const targetDensity = this.getEffectiveDensity(targetIdx, targetEl, targetDef);
+      if (sourceEl === targetEl && this.isAqueousSolution(sourceEl)) {
+        return sourceDensity > targetDensity + 6;
+      }
       return sourceDensity > targetDensity * 1.04;
     }
     return false;
