@@ -282,5 +282,45 @@ test('a tall hump of water rapidly flows laterally and finds a flat level instea
   assert.ok(res.maxColumnHeight <= 3, `Expected 10-tall water column to flatten to <= 3 rows, got ${JSON.stringify(res)}`);
 });
 
+test('large 36,000-pixel liquid bodies and magma_trench fast-skip quiescent interior pixels for 60 FPS headroom', () => {
+  const { performance } = require('node:perf_hooks');
+  const game = createGame();
 
+  // 1. Verify magma_trench steps rapidly
+  game.run('loadMap("magma_trench"); for (let i = 0; i < 5; i++) world.step(player.x, player.y, sound);');
+  const tMagma0 = performance.now();
+  for (let i = 0; i < 60; i++) {
+    game.run('world.step(player.x, player.y, sound)');
+  }
+  const magmaMsPerStep = (performance.now() - tMagma0) / 60;
+  assert.ok(magmaMsPerStep < 6.0, `Expected magma_trench < 6.0 ms/step, got ${magmaMsPerStep.toFixed(2)} ms/step`);
 
+  // 2. Verify a 36,000-pixel (300x120) Water + Acid mixing vat fast-skips >75% of interior pixels and runs < 6.0 ms/step
+  game.arena();
+  game.run(`
+    const { ElementId } = require("./chemistry/elements");
+    for (let y = 78; y <= 202; y++) {
+      for (let x = 48; x <= 352; x++) {
+        if (y >= 200 || x < 50 || x >= 350) {
+          world.setElement(x, y, ElementId.TUNGSTEN);
+        } else if (y >= 80) {
+          world.setElement(x, y, x < 200 ? ElementId.WATER : ElementId.ACID);
+        }
+      }
+    }
+    world.motionCalls = 0;
+    const origMotion = world.updatePixelMotion.bind(world);
+    world.updatePixelMotion = function(x, y, i, el) {
+      this.motionCalls++;
+      return origMotion(x, y, i, el);
+    };
+  `);
+  const tVat0 = performance.now();
+  for (let i = 0; i < 60; i++) {
+    game.run('world.step(200, 140, sound)');
+  }
+  const vatMsPerStep = (performance.now() - tVat0) / 60;
+  const avgMotionCalls = game.run('world.motionCalls / 60');
+  assert.ok(vatMsPerStep < 6.0, `Expected 36k liquid vat < 6.0 ms/step, got ${vatMsPerStep.toFixed(2)} ms/step`);
+  assert.ok(avgMotionCalls < 6000, `Expected < 6000 motion calls/step out of 36,000 liquid pixels, got ${Math.round(avgMotionCalls)}`);
+});

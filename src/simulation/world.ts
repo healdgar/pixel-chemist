@@ -473,21 +473,79 @@ export class WorldGrid {
 
         const def = ELEMENTS[el];
 
-        // FAST-PATH 2: Static solid wall at near-ambient temperature with no time acceleration
+        // FAST-PATH 2: Static solid wall away from its melting/cryo threshold with no time acceleration
         if (
           def.state === 'solid' &&
           (f & FLAG_TIME_ACCEL) === 0 &&
           p < 1 &&
-          temp[i] > 5 &&
-          temp[i] < 45
+          (def.meltPoint === undefined || temp[i] < def.meltPoint - 10) &&
+          (temp[i] > -105 || (f & FLAG_CRYO_BRITTLE) !== 0)
         ) {
-          // Only sample 1 neighbor to check if an adjacent acid/liquid/hot pixel wants to react
           const dIdx = (this.tickCount + x * 3 + y * 7) & 3;
           const nx = x + (dIdx === 2 ? -1 : dIdx === 3 ? 1 : 0);
           const ny = y + (dIdx === 0 ? -1 : dIdx === 1 ? 1 : 0);
           const ni = ny * W + nx;
           const nel = grid[ni] as ElementId;
-          if ((nel === el || nel === ElementId.EMPTY) && temp[ni] > 5 && temp[ni] < 45 && pressure[ni] < 1) {
+          if ((nel === el || nel === ElementId.EMPTY) && pressure[ni] < 1) {
+            const tDiff = temp[ni] - temp[i];
+            if (tDiff < 1.2 && tDiff > -1.2) {
+              continue;
+            } else if (nel === el) {
+              const dt = tDiff * def.thermalConductivity * 0.36;
+              temp[i] += dt;
+              temp[ni] -= dt;
+              continue;
+            }
+          }
+        }
+
+        // FAST-PATH 3: Quiescent interior liquid pixel buried inside a homogeneous pool/vat
+        if (
+          def.state === 'liquid' &&
+          f === 0 &&
+          p < 1 &&
+          grid[i - 1] === el &&
+          grid[i + 1] === el &&
+          grid[i + W] === el &&
+          grid[i - W] === el
+        ) {
+          const t = temp[i];
+          const safeBoil = def.boilPoint === undefined || t < (el === ElementId.ACID || el === ElementId.ALKALI || el === ElementId.SALT_WATER ? 94 : def.boilPoint - 6);
+          const safeFreeze = def.freezePoint === undefined || t > def.freezePoint + 6;
+          if (safeBoil && safeFreeze) {
+            const dIdx = (this.tickCount + x * 3 + y * 7) & 3;
+            const ni = dIdx < 2 ? i + (dIdx === 0 ? -W : W) : i + (dIdx === 2 ? -1 : 1);
+            const tDiff = temp[ni] - t;
+            if (tDiff > 0.4 || tDiff < -0.4) {
+              const dt = tDiff * def.thermalConductivity * 0.36;
+              temp[i] = t + dt;
+              temp[ni] -= dt;
+            }
+            if (el === ElementId.ACID || el === ElementId.ALKALI || el === ElementId.SALT_WATER) {
+              const c1 = this.life[i] || 100;
+              const c2 = this.life[ni] || 100;
+              if (c1 - c2 >= 2 || c2 - c1 >= 2) {
+                const avg = (c1 + c2) >> 1;
+                this.life[i] = avg;
+                this.life[ni] = c1 + c2 - avg;
+              }
+            }
+            // If also surrounded diagonally below and has no open air within 6px laterally, it cannot move this tick!
+            if (
+              x > 7 &&
+              x < W - 8 &&
+              grid[i + W - 1] === el &&
+              grid[i + W + 1] === el &&
+              grid[i - 2] !== ElementId.EMPTY &&
+              grid[i + 2] !== ElementId.EMPTY &&
+              grid[i - 4] !== ElementId.EMPTY &&
+              grid[i + 4] !== ElementId.EMPTY &&
+              grid[i - 6] !== ElementId.EMPTY &&
+              grid[i + 6] !== ElementId.EMPTY
+            ) {
+              continue;
+            }
+            this.updatePixelMotion(x, y, i, el);
             continue;
           }
         }
@@ -1048,24 +1106,34 @@ export class WorldGrid {
 
     if (state === 'liquid') {
       const W = this.width;
+      const grid = this.grid;
       const by = y + 1;
       const canDrop = by < this.height - 1;
       if (canDrop) {
         const bi = by * W + x;
-        if (this.canDisplace(i, effDensity, bi)) {
+        const bEl = grid[bi] as ElementId;
+        if (bEl === ElementId.EMPTY || (bEl !== el && this.canDisplace(i, effDensity, bi))) {
           this.swap(i, bi);
           return;
         }
         const dir = this.fastCoin() ? -1 : 1;
         const b1x = x + dir;
         const b2x = x - dir;
-        if (b1x > 1 && b1x < W - 2 && this.canDisplace(i, effDensity, by * W + b1x)) {
-          this.swap(i, by * W + b1x);
-          return;
+        if (b1x > 1 && b1x < W - 2) {
+          const b1i = by * W + b1x;
+          const b1El = grid[b1i] as ElementId;
+          if (b1El === ElementId.EMPTY || (b1El !== el && this.canDisplace(i, effDensity, b1i))) {
+            this.swap(i, b1i);
+            return;
+          }
         }
-        if (b2x > 1 && b2x < W - 2 && this.canDisplace(i, effDensity, by * W + b2x)) {
-          this.swap(i, by * W + b2x);
-          return;
+        if (b2x > 1 && b2x < W - 2) {
+          const b2i = by * W + b2x;
+          const b2El = grid[b2i] as ElementId;
+          if (b2El === ElementId.EMPTY || (b2El !== el && this.canDisplace(i, effDensity, b2i))) {
+            this.swap(i, b2i);
+            return;
+          }
         }
       }
 
@@ -1079,8 +1147,33 @@ export class WorldGrid {
           : el === ElementId.OIL || el === ElementId.BIO_GEL
             ? 4
             : 8;
-      // Hydrostatic head: true if there is liquid directly above (x, y) pressing down on this pixel
-      const hasLiquidHead = y > 2 && ELEMENTS[this.grid[(y - 1) * W + x] as ElementId].state === 'liquid';
+      // Hydrostatic head at the crest of a hump: liquid directly above (y - 1) within 4px of the free surface
+      const hasLiquidHead =
+        y > 4 &&
+        ELEMENTS[grid[(y - 1) * W + x] as ElementId].state === 'liquid' &&
+        grid[(y - 4) * W + x] === ElementId.EMPTY;
+
+      // Fast skip for flat-surface liquid pixels surrounded by the same liquid on both sides and below
+      if (
+        !hasLiquidHead &&
+        grid[i - 1] === el &&
+        grid[i + 1] === el &&
+        canDrop &&
+        grid[by * W + x - 1] === el &&
+        grid[by * W + x + 1] === el
+      ) {
+        if (isSol) {
+          const hi = i + hDir;
+          const c1 = this.getConcentration(i);
+          const c2 = this.getConcentration(hi);
+          if (Math.abs(c1 - c2) >= 2) {
+            const avg = (c1 + c2) >> 1;
+            this.life[i] = avg;
+            this.life[hi] = c1 + c2 - avg;
+          }
+        }
+        return;
+      }
 
       // Try primary random direction first, then fallback to opposite direction so slopes never stall 50% of ticks
       for (let dPass = 0; dPass < 2; dPass++) {
@@ -1092,28 +1185,23 @@ export class WorldGrid {
           const hx = x + dir * step;
           if (hx <= 1 || hx >= W - 2) break;
           const hi = y * W + hx;
-          const targetEl = this.grid[hi] as ElementId;
+          const targetEl = grid[hi] as ElementId;
 
           // If there is a lower empty/displaceable spot at (hx, y + 1), immediately cascade down the shallow slope!
           if (canDrop) {
             const bhi = by * W + hx;
-            if (this.canDisplace(i, effDensity, bhi)) {
+            const bEl = grid[bhi] as ElementId;
+            if (
+              bEl === ElementId.EMPTY ||
+              (step === 1 && bEl !== el && this.canDisplace(i, effDensity, bhi))
+            ) {
               this.swap(i, bhi);
               return;
             }
           }
 
-          if (this.canDisplace(i, effDensity, hi)) {
-            if (!tunneledThroughLiquid || hasLiquidHead) {
-              bestTarget = hi;
-            }
-            // If tunneling out of a pressurized hump, pop out at the first open lateral edge cell;
-            // if gliding in open air, keep scanning up to maxSpread for fast lateral flow.
-            if (tunneledThroughLiquid || (step >= 2 && targetEl !== ElementId.EMPTY)) break;
-          } else if (targetEl === el || (isMiscible && this.isMiscibleAqueous(targetEl))) {
-            tunneledThroughLiquid = true;
-            // Equalize solute concentration across the pool width
-            if (isSol && targetEl === el) {
+          if (targetEl === el) {
+            if (dPass === 0 && step === 1 && isSol) {
               const c1 = this.getConcentration(i);
               const c2 = this.getConcentration(hi);
               if (Math.abs(c1 - c2) >= 2) {
@@ -1121,10 +1209,22 @@ export class WorldGrid {
                 this.life[i] = avg;
                 this.life[hi] = c1 + c2 - avg;
               }
-            } else if (isMiscible && targetEl !== el && dPass === 0 && step === 1 && this.fastRand() < 0.28) {
+            }
+            if (!hasLiquidHead) break;
+            tunneledThroughLiquid = true;
+          } else if (
+            targetEl === ElementId.EMPTY ||
+            (!tunneledThroughLiquid && this.canDisplace(i, effDensity, hi))
+          ) {
+            bestTarget = hi;
+            if (tunneledThroughLiquid || (step >= 2 && targetEl !== ElementId.EMPTY)) break;
+          } else if (step === 1 && isMiscible && this.isMiscibleAqueous(targetEl)) {
+            if (dPass === 0 && this.fastRand() < 0.28) {
               this.swap(i, hi);
               return;
             }
+            if (!hasLiquidHead) break;
+            tunneledThroughLiquid = true;
           } else {
             break;
           }

@@ -96,6 +96,7 @@ export class WorldRenderer {
     const tempArr = world.temp;
     const pressArr = world.pressure;
     const flagsArr = world.flags;
+    const lifeArr = world.life;
     const bgArr = world.bgGrid;
     const noiseArr = world.colorNoise;
     const buf32 = this.buf32;
@@ -278,7 +279,8 @@ export class WorldRenderer {
 
         // Aqueous admixture color blending for ACID / ALKALI / SALT_WATER (blends smoothly toward Water [42, 138, 235])
         if (el === ElementId.ACID || el === ElementId.ALKALI || el === ElementId.SALT_WATER) {
-          const conc = world.life[i] > 0 ? (world.life[i] > 100 ? 100 : world.life[i]) : 100;
+          const rawLife = lifeArr[i];
+          const conc = rawLife > 0 ? (rawLife > 100 ? 100 : rawLife) : 100;
           if (conc < 99) {
             const w = (100 - conc) * 0.0092;
             r = (r * (1 - w) + (42 + delta) * w) | 0;
