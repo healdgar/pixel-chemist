@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "vite",
     "test": "node --test tests/*.test.cjs",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && mkdir -p release && rm -f release/pixel-chemist-itch-1.0.zip && zip -jq release/pixel-chemist-itch-1.0.zip dist/index.html",
     "preview": "vite preview"
   },
   "devDependencies": {
