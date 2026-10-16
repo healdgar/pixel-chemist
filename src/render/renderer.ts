@@ -11,6 +11,26 @@ import { WorldGrid } from '../simulation/world';
 import { Player } from '../entities/player';
 import { Projectile, TOOLS } from '../entities/tools';
 import { LevelData } from '../world/levelGenerator';
+import {
+  drawCompiledSprite,
+  SPRITE_ALARM_BEACON,
+  SPRITE_BIBBI,
+  SPRITE_BIBBI_PIGGYBACK,
+  SPRITE_CEILING_SPRAYER,
+  SPRITE_DRILLPOD,
+  SPRITE_DRONE,
+  SPRITE_GUARD_BODY,
+  SPRITE_GUARD_RIFLE,
+  SPRITE_LASER_EMITTER,
+  SPRITE_MECH_BODY,
+  SPRITE_MECH_CANNON,
+  SPRITE_OMNI_TOOL,
+  SPRITE_PLAYER_BODY,
+  SPRITE_SUBMERSIBLE,
+  SPRITE_TERMINAL,
+  SPRITE_TURRET,
+  SPRITE_VTOL,
+} from './pixelSprites';
 
 // Precomputed 256-entry sine lookup table (-1..1) for zero-trig inner-loop rendering at 4x pixel density
 const SIN_LUT = new Float32Array(256);
@@ -418,31 +438,49 @@ export class WorldRenderer {
     sy: number,
     tick: number
   ): void {
-    const ex = sx * 2;
-    const ey = sy * 2;
+    const ux = sx * 0.72;
+    const uy = sy * 0.72;
+    const screenColor = tick % 40 < 28 ? '#00f5d4' : '#4cc9f0';
+    const termPalette: Record<string, string> = {
+      O: '#141824',
+      S: '#495057',
+      g: '#2b2d42',
+      C: '#0096c7',
+      R: '#ff595e',
+      G: '#80ed99',
+      Y: '#ffd166',
+      K: '#adb5bd',
+    };
+
     for (const term of level.terminals) {
       const vx = term.x - camX;
       const vy = term.y - camY;
-      if (vx < -20 || vx > this.viewW + 20 || vy < -20 || vy > this.viewH + 20) continue;
+      if (vx < -24 || vx > this.viewW + 24 || vy < -24 || vy > this.viewH + 24) continue;
 
       const px = vx * sx;
       const py = vy * sy;
 
-      // Terminal stand & glowing CRT monitor
-      ctx.fillStyle = '#2b2d42';
-      ctx.fillRect(px - 2 * ex, py - 3 * ey, 4 * ex, 6 * ey);
-      ctx.fillStyle = tick % 30 < 20 ? '#00f5d4' : '#4cc9f0';
-      ctx.fillRect(px - 1.5 * ex, py - 2.5 * ey, 3 * ex, 2.2 * ey);
+      drawCompiledSprite(ctx, SPRITE_TERMINAL, px, py - 1 * sy, ux, uy, termPalette, false);
+
+      // Animated CRT data scanlines inside screen
+      ctx.fillStyle = screenColor;
+      const scanY = (tick >> 2) % 4;
+      ctx.fillRect(px - 3.2 * ux, py - (7.2 - scanY) * uy, 5.8 * ux, 0.85 * uy);
+      ctx.fillStyle = '#a8f9ff';
+      ctx.fillRect(px - 3.2 * ux, py - 7.5 * uy, 3.4 * ux, 0.75 * uy);
 
       const dist = Math.hypot(player.x - term.x, player.y - term.y);
       if (dist < 32) {
         ctx.save();
         ctx.font = 'bold 10px "JetBrains Mono", monospace';
         ctx.textAlign = 'center';
-        ctx.fillStyle = 'rgba(10, 15, 28, 0.85)';
-        ctx.fillRect(px - 22, py - 22, 44, 15);
+        ctx.fillStyle = 'rgba(10, 15, 28, 0.88)';
+        ctx.fillRect(px - 22, py - 24, 44, 15);
+        ctx.strokeStyle = '#00f5d4';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(px - 22, py - 24, 44, 15);
         ctx.fillStyle = '#00f5d4';
-        ctx.fillText('[E]', px, py - 11);
+        ctx.fillText('[E]', px, py - 13);
         ctx.restore();
       }
     }
@@ -457,31 +495,46 @@ export class WorldRenderer {
     sy: number,
     tick: number
   ): void {
+    const ux = sx * 0.78;
+    const uy = sy * 0.78;
     const ex = sx * 2;
     const ey = sy * 2;
+
     for (const t of level.turrets) {
       if (!t.active) continue;
       const vx = t.x - camX;
       const vy = t.y - camY;
-      if (vx < -20 || vx > this.viewW + 20 || vy < -20 || vy > this.viewH + 20) continue;
+      if (vx < -24 || vx > this.viewW + 24 || vy < -24 || vy > this.viewH + 24) continue;
 
       const px = vx * sx;
       const py = vy * sy;
-
-      ctx.fillStyle = '#495057';
-      ctx.fillRect(px - 2.5 * ex, py - 2.5 * ey, 5 * ex, 5 * ey);
-
-      ctx.fillStyle =
+      const coreColor =
         t.type === 'kinetic' ? '#ffd166' : t.type === 'thermal' ? '#ff595e' : '#70e000';
-      const pulse = Math.sin(tick * 0.15) * 0.4 + 1.2;
-      ctx.fillRect(px - pulse * ex, py - pulse * ey, pulse * 2 * ex, pulse * 2 * ey);
+
+      const turretPalette: Record<string, string> = {
+        O: '#11151c',
+        S: '#495057',
+        s: '#6c757d',
+        g: '#2b2d42',
+        G: '#343a40',
+        M: (tick & 7) < 4 ? coreColor : '#adb5bd',
+        L: coreColor,
+      };
+
+      drawCompiledSprite(ctx, SPRITE_TURRET, px, py, ux, uy, turretPalette, false);
+
+      // Subtle laser rangefinder glint on top pod
+      if ((tick & 15) < 10) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(px + 0.5 * ux, py - 5.8 * uy, 1.1 * ux, 1.1 * uy);
+      }
 
       // HP bar if damaged
       if (t.hp < t.maxHp) {
-        ctx.fillStyle = '#222';
-        ctx.fillRect(px - 3 * ex, py - 4.2 * ey, 6 * ex, 1 * ey);
+        ctx.fillStyle = '#141824';
+        ctx.fillRect(px - 3 * ex, py - 4.6 * ey, 6 * ex, 1 * ey);
         ctx.fillStyle = '#ff595e';
-        ctx.fillRect(px - 3 * ex, py - 4.2 * ey, 6 * ex * (t.hp / t.maxHp), 1 * ey);
+        ctx.fillRect(px - 3 * ex, py - 4.6 * ey, 6 * ex * (t.hp / t.maxHp), 1 * ey);
       }
     }
   }
@@ -496,8 +549,9 @@ export class WorldRenderer {
     tick: number
   ): void {
     if (!level.defenses) return;
+    const ux = sx * 0.78;
+    const uy = sy * 0.78;
     const ex = sx * 2;
-    const ey = sy * 2;
 
     for (const d of level.defenses) {
       if (!d.active) continue;
@@ -512,44 +566,92 @@ export class WorldRenderer {
         const endPx = (d.currentEndX - camX) * sx;
         const endPy = (d.currentEndY - camY) * sy;
 
-        // Emitter housing
-        ctx.fillStyle = '#343a40';
-        ctx.fillRect(px - 1.5 * ex, py - 1.5 * ey, 3 * ex, 3 * ey);
-        ctx.fillStyle = '#ff4d6d';
-        ctx.fillRect(px - 0.8 * ex, py - 0.8 * ey, 1.6 * ex, 1.6 * ey);
+        // Beveled 16-bit Wall Laser Emitter Housing
+        drawCompiledSprite(
+          ctx,
+          SPRITE_LASER_EMITTER,
+          px,
+          py,
+          ux,
+          uy,
+          {
+            O: '#11151c',
+            S: '#6c757d',
+            s: '#343a40',
+            g: '#2b2d42',
+            L: d.triggered ? '#ff0055' : '#e63946',
+            W: '#ffccd5',
+          },
+          false
+        );
 
-        // Laser beam
+        // Dual-layer Laser Beam (Outer crimson glow + hot white-pink core)
         ctx.save();
         ctx.strokeStyle = d.triggered
-          ? '#ffffff'
+          ? 'rgba(255, 0, 85, 0.85)'
           : (tick & 3) === 0
-          ? 'rgba(255, 77, 109, 0.95)'
-          : 'rgba(247, 37, 133, 0.72)';
-        ctx.lineWidth = d.triggered ? 3.5 : 2;
+          ? 'rgba(255, 77, 109, 0.75)'
+          : 'rgba(247, 37, 133, 0.55)';
+        ctx.lineWidth = d.triggered ? 4.5 : 3.0;
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        ctx.lineTo(endPx, endPy);
+        ctx.stroke();
+
+        ctx.strokeStyle = d.triggered ? '#ffffff' : '#ffccd5';
+        ctx.lineWidth = d.triggered ? 1.8 : 1.1;
         ctx.beginPath();
         ctx.moveTo(px, py);
         ctx.lineTo(endPx, endPy);
         ctx.stroke();
 
         // Endpoint laser hotspot
-        ctx.fillStyle = '#ffccd5';
+        ctx.fillStyle = '#ff0055';
         ctx.beginPath();
-        ctx.arc(endPx, endPy, 1.2 * ex, 0, Math.PI * 2);
+        ctx.arc(endPx, endPy, 1.5 * ex, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(endPx, endPy, 0.7 * ex, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       } else if (d.type === 'ceiling_sprayer') {
-        ctx.fillStyle = '#343a40';
-        ctx.fillRect(px - 2.2 * ex, py - 1.2 * ey, 4.4 * ex, 2.4 * ey);
-        ctx.fillStyle = d.triggered ? '#80ed99' : '#4cc9f0';
-        ctx.fillRect(px - 1.2 * ex, py + 0.8 * ey, 2.4 * ex, 1.2 * ey);
+        drawCompiledSprite(
+          ctx,
+          SPRITE_CEILING_SPRAYER,
+          px,
+          py + 1.5 * uy,
+          ux,
+          uy,
+          {
+            O: '#11151c',
+            S: '#6c757d',
+            g: '#343a40',
+            Y: d.triggered ? '#80ed99' : '#ffd166',
+            W: '#f8f9fa',
+            C: d.triggered ? '#80ed99' : '#4cc9f0',
+          },
+          false
+        );
       } else if (d.type === 'alarm_beacon') {
-        ctx.fillStyle = '#2b2d42';
-        ctx.fillRect(px - 2 * ex, py - 2 * ey, 4 * ex, 4 * ey);
         const pulse = Math.sin(tick * 0.25) > 0;
-        ctx.fillStyle = d.triggered ? (pulse ? '#ff0055' : '#ffd166') : '#f72585';
-        ctx.beginPath();
-        ctx.arc(px, py, 1.4 * ex, 0, Math.PI * 2);
-        ctx.fill();
+        drawCompiledSprite(
+          ctx,
+          SPRITE_ALARM_BEACON,
+          px,
+          py,
+          ux,
+          uy,
+          {
+            O: '#11151c',
+            R: d.triggered ? (pulse ? '#ff0055' : '#ff595e') : '#d90429',
+            Y: '#ffd166',
+            W: d.triggered && pulse ? '#ffffff' : '#ffbe0b',
+            S: '#adb5bd',
+            g: '#495057',
+          },
+          false
+        );
 
         if (d.triggered) {
           ctx.save();
@@ -557,7 +659,7 @@ export class WorldRenderer {
           ctx.lineWidth = 1.5;
           const r = ((tick % 30) / 30) * 18 * ex;
           ctx.beginPath();
-          ctx.arc(px, py, r, 0, Math.PI * 2);
+          ctx.arc(px, py - 2 * uy, r, 0, Math.PI * 2);
           ctx.stroke();
           ctx.restore();
         }
@@ -584,11 +686,12 @@ export class WorldRenderer {
       if (!u.active) continue;
       const vx = u.x - camX;
       const vy = u.y - camY;
-      if (vx < -35 || vx > this.viewW + 35 || vy < -35 || vy > this.viewH + 35) continue;
+      if (vx < -40 || vx > this.viewW + 40 || vy < -40 || vy > this.viewH + 40) continue;
 
       const px = vx * sx;
       const py = vy * sy;
       const f = u.facing;
+      const flip = f < 0;
 
       ctx.save();
 
@@ -597,8 +700,8 @@ export class WorldRenderer {
         ctx.strokeStyle = '#4cc9f0';
         ctx.lineWidth = 2;
         ctx.strokeRect(
-          px - (u.width * 0.32) * ex,
-          py - (u.height * 0.32) * ey,
+          px - u.width * 0.32 * ex,
+          py - u.height * 0.32 * ey,
           u.width * 0.64 * ex,
           u.height * 0.64 * ey
         );
@@ -606,115 +709,182 @@ export class WorldRenderer {
         ctx.strokeStyle = '#72efdd';
         ctx.lineWidth = 2;
         ctx.strokeRect(
-          px - (u.width * 0.3) * ex,
-          py - (u.height * 0.3) * ey,
+          px - u.width * 0.3 * ex,
+          py - u.height * 0.3 * ey,
           u.width * 0.6 * ex,
           u.height * 0.6 * ey
         );
       }
 
       if (u.type === 'guard') {
-        // HAZMAT ALCHEMY GUARD SPRITE
+        const ux = sx * 0.78;
+        const uy = sy * 0.78;
         const loadoutColor =
           u.weaponLoadout === 'cryo'
             ? '#72efdd'
             : u.weaponLoadout === 'acid'
             ? '#80ed99'
             : '#ff595e';
+        const rusted = u.rustedLevel > 25;
 
-        // Backpack Chemical Tank
-        ctx.fillStyle = loadoutColor;
-        ctx.fillRect(px - f * 2.5 * ex, py - 2.0 * ey, 1.3 * ex, 3.8 * ey);
-
-        // Crimson/Obsidian Tactical Hazmat Suit
-        ctx.fillStyle = u.rustedLevel > 25 ? '#9e472a' : '#d90429';
-        ctx.fillRect(px - 2.0 * ex, py - 1.5 * ey, 4.0 * ex, 4.2 * ey);
-
-        // Helmet & Glowing Amber/Red Tactical Visor
+        // Animated Guard Boots & Knee Pads
+        const swing = Math.abs(u.vx) > 0.1 ? Math.sin(tick * 0.32) * 1.6 : 0;
+        ctx.fillStyle = '#11151c';
+        ctx.fillRect(px - 3.6 * ux, py + (5.8 + swing * 0.4) * uy, 3.0 * ux, 4.2 * uy);
+        ctx.fillRect(px + 0.8 * ux, py + (5.8 - swing * 0.4) * uy, 3.0 * ux, 4.2 * uy);
         ctx.fillStyle = '#2b2d42';
-        ctx.fillRect(px - 2.0 * ex, py - 4.4 * ey, 4.0 * ex, 2.9 * ey);
-        ctx.fillStyle = loadoutColor;
-        ctx.fillRect(
-          f > 0 ? px - 0.3 * ex : px - 1.8 * ex,
-          py - 3.6 * ey,
-          2.1 * ex,
-          1.4 * ey
+        ctx.fillRect(px - 3.0 * ux, py + (6.2 + swing * 0.4) * uy, 1.8 * ux, 3.2 * uy);
+        ctx.fillRect(px + 1.4 * ux, py + (6.2 - swing * 0.4) * uy, 1.8 * ux, 3.2 * uy);
+
+        drawCompiledSprite(
+          ctx,
+          SPRITE_GUARD_BODY,
+          px,
+          py - 0.8 * uy,
+          ux,
+          uy,
+          {
+            O: '#11151c',
+            H: '#2b2d42',
+            R: rusted ? '#b55335' : '#d90429',
+            r: rusted ? '#7f3924' : '#9b001a',
+            o: '#1b1f2a',
+            g: '#6c757d',
+            Y: '#ffd166',
+            V: loadoutColor,
+            M: '#495057',
+            D: '#212529',
+          },
+          flip
         );
 
-        // Animated Guard Legs
-        const swing = Math.abs(u.vx) > 0.1 ? Math.sin(tick * 0.32) * 1.1 : 0;
-        ctx.fillStyle = '#1b1f2a';
-        ctx.fillRect(px - 1.5 * ex, py + (2.7 + swing * 0.35) * ey, 1.2 * ex, 1.9 * ey);
-        ctx.fillRect(px + 0.3 * ex, py + (2.7 - swing * 0.35) * ey, 1.2 * ex, 1.9 * ey);
-
-        // Counter-Alchemy Rifle
-        ctx.fillStyle = '#adb5bd';
-        ctx.fillRect(px + (f > 0 ? 0.5 : -3.8) * ex, py - 0.6 * ey, 3.3 * ex, 1.1 * ey);
-        ctx.fillStyle = loadoutColor;
-        ctx.fillRect(px + (f > 0 ? 3.2 : -4.2) * ex, py - 0.8 * ey, 1.0 * ex, 1.5 * ey);
+        // Counter-Alchemy Assault Rifle
+        drawCompiledSprite(
+          ctx,
+          SPRITE_GUARD_RIFLE,
+          px + f * 3.8 * ux,
+          py + 0.8 * uy,
+          ux * 0.85,
+          uy * 0.85,
+          {
+            O: '#11151c',
+            G: '#adb5bd',
+            L: loadoutColor,
+          },
+          flip
+        );
       } else if (u.type === 'drone') {
-        // AUTONOMOUS HUNTER-SEEKER DRONE SPRITE
-        const rotorSpin = (tick & 1) === 0 ? 3.4 : 2.0;
-        ctx.fillStyle = '#4cc9f0';
-        ctx.fillRect(px - 3.6 * ex, py - 2.6 * ey, rotorSpin * ex, 0.7 * ey);
-        ctx.fillRect(px + (3.6 - rotorSpin) * ex, py - 2.6 * ey, rotorSpin * ex, 0.7 * ey);
+        const ux = sx * 0.76;
+        const uy = sy * 0.76;
+        const eyeColor = u.weaponLoadout === 'sodium_bomb' ? '#ff9f1c' : '#f72585';
+        const rotorPhase = (tick & 1) === 0 ? '#00f5d4' : '#4cc9f0';
 
-        // armored chassis orb
-        ctx.fillStyle = '#2b2d42';
-        ctx.fillRect(px - 2.8 * ex, py - 1.8 * ey, 5.6 * ex, 3.6 * ey);
-
-        // Glowing J.E.V. Sensor Eye
-        ctx.fillStyle = u.weaponLoadout === 'sodium_bomb' ? '#ff9f1c' : '#f72585';
-        ctx.fillRect(px - 1.2 * ex, py - 0.8 * ey, 2.4 * ex, 1.6 * ey);
-
-        // Bottom Sodium/Thermite payload bay
-        ctx.fillStyle = '#ff9f1c';
-        ctx.fillRect(px - 1.4 * ex, py + 1.8 * ey, 2.8 * ex, 1.0 * ey);
-      } else if (u.type === 'robot') {
-        // HEAVY AEGIS COMBAT MECH / WALKER SPRITE
-        const rustTint = u.rustedLevel > 20;
-        // Heavy Armored Torso
-        ctx.fillStyle = rustTint ? '#8c3f27' : '#495057';
-        ctx.fillRect(px - 3.8 * ex, py - 5.2 * ey, 7.6 * ex, 6.8 * ey);
-
-        // Shoulder Pauldrons & Graviton Cannons
-        ctx.fillStyle = rustTint ? '#a44a2d' : '#6c757d';
-        ctx.fillRect(px - 4.6 * ex, py - 5.6 * ey, 2.2 * ex, 3.2 * ey);
-        ctx.fillRect(px + 2.4 * ex, py - 5.6 * ey, 2.2 * ex, 3.2 * ey);
-
-        // Glowing Cyclops J.E.V. Optic
-        ctx.fillStyle = '#ff0055';
-        ctx.fillRect(
-          px + (f > 0 ? -0.5 : -2.5) * ex,
-          py - 3.8 * ey,
-          3.0 * ex,
-          1.6 * ey
+        drawCompiledSprite(
+          ctx,
+          SPRITE_DRONE,
+          px,
+          py,
+          ux,
+          uy,
+          {
+            O: '#11151c',
+            C: rotorPhase,
+            g: '#495057',
+            S: '#2b2d42',
+            M: eyeColor,
+            W: '#ffffff',
+            Y: '#ff9f1c',
+            y: '#e07a5f',
+          },
+          flip
         );
 
-        // Articulated Hydraulic Walker Legs
-        const stomp = Math.abs(u.vx) > 0.1 ? Math.sin(tick * 0.22) * 1.4 : 0;
-        ctx.fillStyle = rustTint ? '#6e321f' : '#343a40';
-        ctx.fillRect(px - 3.0 * ex, py + (1.6 + stomp * 0.4) * ey, 2.2 * ex, 4.2 * ey);
-        ctx.fillRect(px + 0.8 * ex, py + (1.6 - stomp * 0.4) * ey, 2.2 * ex, 4.2 * ey);
+        // Shimmering plasma rotor rings
+        ctx.fillStyle = '#a8f9ff';
+        const rPulse = (tick & 1) === 0 ? 7.5 : 5.0;
+        ctx.fillRect(px - rPulse * ux, py - 6.8 * uy, 2.2 * ux, 0.9 * uy);
+        ctx.fillRect(px + (rPulse - 2.2) * ux, py - 6.8 * uy, 2.2 * ux, 0.9 * uy);
+      } else if (u.type === 'robot') {
+        // HEAVY AEGIS COMBAT MECH / WALKER SPRITE (24x22 Upper + Articulated Hydraulic Legs)
+        const ux = sx * 0.82;
+        const uy = sy * 0.82;
+        const rustTint = u.rustedLevel > 20;
 
-        // Heavy Arm Cannon
-        ctx.fillStyle = '#ffd166';
-        ctx.fillRect(px + (f > 0 ? 2.5 : -6.5) * ex, py - 1.8 * ey, 4.0 * ex, 2.0 * ey);
+        // Articulated Reverse-Joint Walker Legs with Copper Hydraulic Pistons
+        const stomp = Math.abs(u.vx) > 0.1 ? Math.sin(tick * 0.22) * 2.2 : 0;
+        const legL = py + (3.2 + stomp * 0.45) * uy;
+        const legR = py + (3.2 - stomp * 0.45) * uy;
+
+        // Left & Right Leg Outlines + Armor Greaves + Pistons + Claws
+        for (let side = -1; side <= 1; side += 2) {
+          const lx = px + side * 4.4 * ux;
+          const ly = side < 0 ? legL : legR;
+          ctx.fillStyle = '#11151c';
+          ctx.fillRect(lx - 2.6 * ux, ly, 5.2 * ux, 8.2 * uy);
+          ctx.fillRect(lx - 3.6 * ux, ly + 6.4 * uy, 7.2 * ux, 2.2 * uy);
+          ctx.fillStyle = rustTint ? '#7f3924' : '#495057';
+          ctx.fillRect(lx - 1.8 * ux, ly + 0.6 * uy, 3.6 * ux, 6.8 * uy);
+          // Hydraulic copper piston rod
+          ctx.fillStyle = '#f4a261';
+          ctx.fillRect(lx - 0.5 * ux, ly + 1.2 * uy, 1.1 * ux, 3.2 * uy);
+          // Armored footpad
+          ctx.fillStyle = rustTint ? '#9e472a' : '#6c757d';
+          ctx.fillRect(lx - 2.8 * ux, ly + 6.8 * uy, 5.6 * ux, 1.2 * uy);
+        }
+
+        // Upper Torso, Beveled Pauldrons & Cyclops Visor
+        drawCompiledSprite(
+          ctx,
+          SPRITE_MECH_BODY,
+          px,
+          py - 3.5 * uy,
+          ux,
+          uy,
+          {
+            O: '#11151c',
+            P: rustTint ? '#b55335' : '#8d99ae',
+            p: rustTint ? '#8c3f27' : '#6c757d',
+            H: rustTint ? '#7f3924' : '#495057',
+            h: rustTint ? '#5e2a1b' : '#343a40',
+            g: '#2b2d42',
+            R: '#ff0055',
+            W: '#ffccd5',
+            c: '#ff9f1c',
+          },
+          flip
+        );
+
+        // Heavy Yellow-Gold Graviton Arm Cannon
+        drawCompiledSprite(
+          ctx,
+          SPRITE_MECH_CANNON,
+          px + f * 8.5 * ux,
+          py - 1.8 * uy,
+          ux * 0.95,
+          uy * 0.95,
+          {
+            O: '#11151c',
+            Y: '#ffd166',
+            y: '#f4a261',
+            C: '#00f5d4',
+          },
+          !flip
+        );
       }
 
-      // Minimal HP Bar above unit ONLY when damaged (no floating text clutter!)
+      // Minimal HP Bar above unit ONLY when damaged
       if (u.hp < u.maxHp) {
         const barW = (u.type === 'robot' ? 7 : 5) * ex;
-        const barY = py - (u.height * 0.34 + 2.0) * ey;
-        ctx.fillStyle = 'rgba(10, 14, 24, 0.85)';
-        ctx.fillRect(px - barW / 2, barY, barW, 0.9 * ey);
+        const barY = py - (u.height * 0.34 + 2.2) * ey;
+        ctx.fillStyle = 'rgba(10, 14, 24, 0.88)';
+        ctx.fillRect(px - barW / 2, barY, barW, 0.95 * ey);
         ctx.fillStyle =
           u.cryoBrittleTimer > 0
             ? '#72efdd'
             : u.rustedLevel > 25
             ? '#ff9f1c'
             : '#ff4d6d';
-        ctx.fillRect(px - barW / 2, barY, barW * Math.max(0, u.hp / u.maxHp), 0.9 * ey);
+        ctx.fillRect(px - barW / 2, barY, barW * Math.max(0, u.hp / u.maxHp), 0.95 * ey);
       }
 
       ctx.restore();
@@ -734,13 +904,14 @@ export class WorldRenderer {
     if (!ev) return;
     const vx = ev.x - camX;
     const vy = ev.y - camY;
-    if (vx < -60 || vx > this.viewW + 60 || vy < -60 || vy > this.viewH + 60) return;
+    if (vx < -65 || vx > this.viewW + 65 || vy < -65 || vy > this.viewH + 65) return;
 
     const ex = sx * 2;
-    const ey = sy * 2;
     const hover = Math.sin(tick * 0.09) * 1.4;
     const px = vx * sx;
     const py = (vy + hover) * sy;
+    const ux = sx * 1.05;
+    const uy = sy * 1.05;
     const ready = level.bibbi.carried;
 
     ctx.save();
@@ -754,45 +925,77 @@ export class WorldRenderer {
     ctx.arc(px, py, 16 * ex, 0, Math.PI * 2);
     ctx.fill();
 
-    // Landing struts
-    ctx.fillStyle = '#495057';
-    ctx.fillRect(px - 7 * ex, py + 4.5 * ey, 14 * ex, 1.2 * ey);
-    ctx.fillRect(px - 5 * ex, py + 2.5 * ey, 1.4 * ex, 2.5 * ey);
-    ctx.fillRect(px + 3.6 * ex, py + 2.5 * ey, 1.4 * ex, 2.5 * ey);
-
-    // Vehicle Hull & Cockpit by type
     if (ev.type === 'submersible') {
-      // Deep-sea bathysphere hull
-      ctx.fillStyle = '#ffd166';
-      ctx.fillRect(px - 7.5 * ex, py - 3.5 * ey, 15 * ex, 6.5 * ey);
-      ctx.fillStyle = '#00f5d4';
-      ctx.fillRect(px - 3 * ex, py - 2.2 * ey, 6 * ex, 3.8 * ey);
+      // Deep-Sea Yellow Bathysphere Submersible
+      drawCompiledSprite(
+        ctx,
+        SPRITE_SUBMERSIBLE,
+        px,
+        py,
+        ux,
+        uy,
+        {
+          O: '#141824',
+          Y: '#ffd166',
+          y: '#f4a261',
+          g: '#6c757d',
+          L: '#adb5bd',
+          C: ready ? '#06d6a0' : '#00f5d4',
+          W: '#ffffff',
+          P: (tick & 3) < 2 ? '#e09f3e' : '#ffd166',
+        },
+        false
+      );
     } else if (ev.type === 'drillpod') {
-      // Subterranean extraction pod
-      ctx.fillStyle = '#ff9f1c';
-      ctx.fillRect(px - 7 * ex, py - 3.5 * ey, 14 * ex, 6.5 * ey);
-      ctx.fillStyle = '#adb5bd';
-      ctx.fillRect(px - 9.5 * ex, py - 2 * ey, 2.5 * ex, 3.5 * ey);
-      ctx.fillStyle = '#06d6a0';
-      ctx.fillRect(px - 2.5 * ex, py - 2 * ey, 5.5 * ex, 3.2 * ey);
+      // Subterranean Armored Terranaught Drill-Pod
+      const fluteSwap = (tick & 3) < 2;
+      drawCompiledSprite(
+        ctx,
+        SPRITE_DRILLPOD,
+        px,
+        py,
+        ux,
+        uy,
+        {
+          O: '#141824',
+          Y: '#e76f51',
+          S: '#6c757d',
+          C: ready ? '#06d6a0' : '#80ed99',
+          W: '#ffffff',
+          D: fluteSwap ? '#adb5bd' : '#dee2e6',
+          s: fluteSwap ? '#495057' : '#adb5bd',
+          g: '#adb5bd',
+          T: '#343a40',
+        },
+        false
+      );
     } else {
-      // VTOL Dropship / Chopper / Shuttle / Sky-Skiff
-      ctx.fillStyle = '#343a40';
-      ctx.fillRect(px - 8.5 * ex, py - 3.2 * ey, 17 * ex, 6.0 * ey);
-      ctx.fillStyle = ready ? '#06d6a0' : '#4cc9f0';
-      ctx.fillRect(px - 4.5 * ex, py - 2.2 * ey, 9 * ex, 3.4 * ey);
+      // VTOL Extraction Dropship / Chopper / Shuttle
+      drawCompiledSprite(
+        ctx,
+        SPRITE_VTOL,
+        px,
+        py,
+        ux,
+        uy,
+        {
+          O: '#11151c',
+          S: '#3d5252',
+          N: '#526b6b',
+          g: '#6c757d',
+          C: ready ? '#06d6a0' : '#4cc9f0',
+          W: '#a8f9ff',
+        },
+        false
+      );
 
-      // Spinning VTOL Rotors / Thruster Pods
-      const rotorW = (tick & 1) === 0 ? 11 : 6;
-      ctx.fillStyle = '#adb5bd';
-      ctx.fillRect(px - rotorW * ex, py - 4.8 * ey, rotorW * 2 * ex, 0.9 * ey);
-      ctx.fillRect(px - 0.8 * ex, py - 4.5 * ey, 1.6 * ex, 1.5 * ey);
-
-      // Thruster afterburner glow when Bibbi is on board/ready
+      // Spinning VTOL Turbofan Rotor Blades & Thruster Afterburner Glow
+      const rotorW = (tick & 1) === 0 ? 11 : 6.5;
+      ctx.fillStyle = '#00f5d4';
+      ctx.fillRect(px - rotorW * ux, py - 8.2 * uy, rotorW * 2 * ux, 1.1 * uy);
       if (ready || (tick & 3) < 2) {
         ctx.fillStyle = ready ? '#06d6a0' : '#4cc9f0';
-        ctx.fillRect(px - 6 * ex, py + 2.8 * ey, 2.2 * ex, 1.8 * ey);
-        ctx.fillRect(px + 3.8 * ex, py + 2.8 * ey, 2.2 * ex, 1.8 * ey);
+        ctx.fillRect(px + 2.5 * ux, py + 3.2 * uy, 4.5 * ux, 2.2 * uy);
       }
     }
 
@@ -800,7 +1003,7 @@ export class WorldRenderer {
     ctx.font = 'bold 10px "JetBrains Mono", monospace';
     ctx.textAlign = 'center';
     ctx.fillStyle = ready ? '#06d6a0' : '#4cc9f0';
-    ctx.fillText(ready ? `🚁 EXTRACT HERE!` : `🚁 ${ev.name.toUpperCase()}`, px, py - 14);
+    ctx.fillText(ready ? `🚁 EXTRACT HERE!` : `🚁 ${ev.name.toUpperCase()}`, px, py - 15);
     ctx.restore();
   }
 
@@ -823,6 +1026,8 @@ export class WorldRenderer {
 
     const ex = sx * 2;
     const ey = sy * 2;
+    const ux = sx * 0.76;
+    const uy = sy * 0.76;
     const bounce = b.rescued ? Math.abs(Math.sin(tick * 0.18)) * 5.0 : Math.sin(tick * 0.08) * 1.2;
     const px = vx * sx;
     const py = (vy - bounce) * sy;
@@ -836,27 +1041,43 @@ export class WorldRenderer {
     ctx.arc(px, py, 9 * ex, 0, Math.PI * 2);
     ctx.fill();
 
-    // Bibbi sprite (magenta/teal lab jacket, pigtails, expressive eyes)
-    ctx.fillStyle = '#ff9f1c';
-    ctx.fillRect(px - 2.5 * ex, py - 3.5 * ey, 5 * ex, 2 * ey);
-    ctx.fillStyle = '#ffe5d9';
-    ctx.fillRect(px - 1.5 * ex, py - 2.5 * ey, 3 * ex, 2.5 * ey);
-    ctx.fillStyle = '#1d3557';
-    ctx.fillRect(px - 1 * ex, py - 1.8 * ey, 0.7 * ex, 0.8 * ey);
-    ctx.fillRect(px + 0.4 * ex, py - 1.8 * ey, 0.7 * ex, 0.8 * ey);
-    ctx.fillStyle = '#f72585';
-    ctx.fillRect(px - 2 * ex, py, 4 * ex, 3.2 * ey);
-    ctx.fillStyle = '#4cc9f0';
-    ctx.fillRect(px - 1.6 * ex, py + 3.2 * ey, 1.2 * ex, 1.4 * ey);
-    ctx.fillRect(px + 0.4 * ex, py + 3.2 * ey, 1.2 * ex, 1.4 * ey);
+    // 16-bit Pixel Art Bibbi (orange twin pigtails, cyan hair ties, magenta lab coat, cyan boots)
+    drawCompiledSprite(
+      ctx,
+      SPRITE_BIBBI,
+      px,
+      py - 0.5 * uy,
+      ux,
+      uy,
+      {
+        O: '#141824',
+        A: '#ff9f1c',
+        a: '#e07a5f',
+        T: '#4cc9f0',
+        S: '#e8b49a',
+        o: '#c68b71',
+        E: '#1d3557',
+        R: '#ff99c8',
+        W: '#f8f9fa',
+        M: '#f72585',
+        m: '#b5179e',
+        C: '#00b4d8',
+      },
+      false
+    );
+
+    // White eye catchlight sparkles
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(px - 2.8 * ux, py - 4.4 * uy, 0.8 * ux, 0.8 * uy);
+    ctx.fillRect(px + 2.2 * ux, py - 4.4 * uy, 0.8 * ux, 0.8 * uy);
 
     // Delicate HP bar if Bibbi has taken damage
     if (b.hp < b.maxHp && b.hp > 0) {
       const barW = 6 * ex;
-      ctx.fillStyle = 'rgba(10, 14, 24, 0.85)';
-      ctx.fillRect(px - barW / 2, py - 5.2 * ey, barW, 1.0 * ey);
+      ctx.fillStyle = 'rgba(10, 14, 24, 0.88)';
+      ctx.fillRect(px - barW / 2, py - 5.6 * ey, barW, 1.0 * ey);
       ctx.fillStyle = b.hp < 35 ? '#ff0055' : '#ff99c8';
-      ctx.fillRect(px - barW / 2, py - 5.2 * ey, barW * Math.max(0, b.hp / b.maxHp), 1.0 * ey);
+      ctx.fillRect(px - barW / 2, py - 5.6 * ey, barW * Math.max(0, b.hp / b.maxHp), 1.0 * ey);
     }
 
     // Subtle compact tag above Bibbi
@@ -864,7 +1085,7 @@ export class WorldRenderer {
     ctx.font = 'bold 10px "JetBrains Mono", monospace';
     ctx.textAlign = 'center';
     ctx.fillStyle = b.rescued ? '#ffd166' : '#ff99c8';
-    ctx.fillText(b.rescued ? '♥ EXTRACTED!' : '♥ BIBBI', px, py - 18);
+    ctx.fillText(b.rescued ? '♥ EXTRACTED!' : '♥ BIBBI', px, py - 19);
     ctx.restore();
   }
 
@@ -885,84 +1106,134 @@ export class WorldRenderer {
     const py = vy * sy;
     const ex = sx * 2;
     const ey = sy * 2;
+    const ux = sx * 0.78;
+    const uy = sy * 0.78;
 
     ctx.save();
     // Quantum Phase Superposition Aura if active!
     if (player.quantumPhaseTimer > 0) {
-      ctx.globalAlpha = 0.65 + Math.sin(tick * 0.4) * 0.25;
+      ctx.globalAlpha = 0.68 + Math.sin(tick * 0.4) * 0.25;
       ctx.strokeStyle = '#c77dff';
       ctx.lineWidth = 2.5;
       ctx.strokeRect(px - 3.5 * ex, py - 5.5 * ey, 7 * ex, 11 * ey);
     }
 
     const f = player.facing;
+    const flip = f < 0;
 
-    // Alchemist Backpack Tank
-    ctx.fillStyle = '#4cc9f0';
-    ctx.fillRect(px - f * 2.6 * ex, py - 2 * ey, 1.4 * ex, 4 * ey);
+    // Jetpack thruster plume when flying upward
+    if (!player.grounded && player.vy < -0.15) {
+      const jetX = px - f * 4.2 * ux;
+      const jetY = py + 3.2 * uy;
+      const flameH = (3.5 + ((tick & 3) * 1.1)) * uy;
+      ctx.fillStyle = '#ffbe0b';
+      ctx.fillRect(jetX - 1.2 * ux, jetY, 2.4 * ux, flameH);
+      ctx.fillStyle = '#00f5d4';
+      ctx.fillRect(jetX - 0.6 * ux, jetY, 1.2 * ux, flameH * 0.65);
+    }
 
-    // Hazmat Suit Body
-    ctx.fillStyle = '#ffd166';
-    ctx.fillRect(px - 2 * ex, py - 1.5 * ey, 4 * ex, 4.2 * ey);
+    // Animated Hazmat Boots & Knee Pads
+    const legSwing = Math.abs(player.vx) > 0.15 ? Math.sin(tick * 0.35) * 1.8 : 0;
+    ctx.fillStyle = '#141824';
+    ctx.fillRect(px - 3.4 * ux, py + (5.8 + legSwing * 0.4) * uy, 3.0 * ux, 4.2 * uy);
+    ctx.fillRect(px + 0.8 * ux, py + (5.8 - legSwing * 0.4) * uy, 3.0 * ux, 4.2 * uy);
+    ctx.fillStyle = '#343a40';
+    ctx.fillRect(px - 2.8 * ux, py + (6.2 + legSwing * 0.4) * uy, 1.8 * ux, 3.2 * uy);
+    ctx.fillRect(px + 1.4 * ux, py + (6.2 - legSwing * 0.4) * uy, 1.8 * ux, 3.2 * uy);
 
-    // Suit Helmet & Glowing Cyan Visor
-    ctx.fillStyle = '#f8f9fa';
-    ctx.fillRect(px - 2 * ex, py - 4.5 * ey, 4 * ex, 3 * ey);
-    ctx.fillStyle = '#00f5d4';
-    ctx.fillRect(
-      f > 0 ? px - 0.5 * ex : px - 1.8 * ex,
-      py - 3.8 * ey,
-      2.3 * ex,
-      1.6 * ey
+    // 16-bit Pixel Art Dr. Vance Body, Domed Helmet, Cyan Visor & Pressurized Tank
+    drawCompiledSprite(
+      ctx,
+      SPRITE_PLAYER_BODY,
+      px,
+      py - 0.8 * uy,
+      ux,
+      uy,
+      {
+        O: '#141824',
+        W: '#f8f9fa',
+        w: '#ced4da',
+        o: '#495057',
+        C: '#00f5d4',
+        V: '#a8f9ff',
+        c: '#0096c7',
+        v: '#adb5bd',
+        B: '#48cae4',
+        b: '#0077b6',
+        h: '#0096c7',
+        Y: '#ffd166',
+        y: '#f4a261',
+        P: '#80ed99',
+        G: '#2b2d42',
+        D: '#2b2d42',
+        U: '#ffd166',
+      },
+      flip
     );
 
-    // Animated Legs
-    const legSwing = Math.abs(player.vx) > 0.15 ? Math.sin(tick * 0.35) * 1.2 : 0;
-    ctx.fillStyle = '#343a40';
-    ctx.fillRect(px - 1.6 * ex, py + (2.7 + legSwing * 0.4) * ey, 1.3 * ex, 2 * ey);
-    ctx.fillRect(px + 0.3 * ex, py + (2.7 - legSwing * 0.4) * ey, 1.3 * ex, 2 * ey);
-
-    // If Bibbi is riding piggyback on Dr. Vance's back (drawn over his backpack/shoulders so she's clearly visible!)
+    // If Bibbi is riding piggyback on Dr. Vance's back (drawn over his backpack/shoulders!)
     const b = level.bibbi;
     if (b.carried && !b.rescued) {
-      const bx = px - f * 2.4 * ex;
-      const by = py - 2.6 * ey + Math.sin(tick * 0.25) * 0.35 * ey;
-      // Bibbi's orange pigtails & head peeking above Dr. Vance's shoulder
-      ctx.fillStyle = '#ff9f1c';
-      ctx.fillRect(bx - 2.2 * ex, by - 3.4 * ey, 4.4 * ex, 1.8 * ey);
-      ctx.fillStyle = '#ffe5d9';
-      ctx.fillRect(bx - 1.4 * ex, by - 2.2 * ey, 2.8 * ex, 2.2 * ey);
-      ctx.fillStyle = '#1d3557';
-      ctx.fillRect(bx + (f > 0 ? 0.2 : -0.9) * ex, by - 1.6 * ey, 0.7 * ex, 0.7 * ey);
-      // Bibbi's magenta jacket, arms hugging Dr. Vance's chest/shoulders, and cyan boots
-      ctx.fillStyle = '#f72585';
-      ctx.fillRect(bx - 1.6 * ex, by, 3.2 * ex, 3.0 * ey);
-      ctx.fillRect(bx, by + 0.2 * ey, f * 3.2 * ex, 1.1 * ey);
-      ctx.fillStyle = '#4cc9f0';
-      ctx.fillRect(bx - 1.0 * ex, by + 3.0 * ey, 1.6 * ex, 1.3 * ey);
+      const bx = px - f * 4.8 * ux;
+      const by = py - 2.6 * uy + Math.sin(tick * 0.25) * 0.6 * uy;
+      drawCompiledSprite(
+        ctx,
+        SPRITE_BIBBI_PIGGYBACK,
+        bx,
+        by,
+        ux * 0.86,
+        uy * 0.86,
+        {
+          O: '#141824',
+          A: '#ff9f1c',
+          a: '#e07a5f',
+          T: '#4cc9f0',
+          S: '#e8b49a',
+          o: '#c68b71',
+          E: '#1d3557',
+          M: '#f72585',
+          m: '#b5179e',
+          C: '#00b4d8',
+          W: '#f8f9fa',
+        },
+        flip
+      );
 
       // Delicate Bibbi HP Bar & Piggyback Tag above Dr. Vance
       const barW = 7.0 * ex;
       ctx.fillStyle = 'rgba(10, 14, 24, 0.9)';
-      ctx.fillRect(px - barW / 2, py - 7.4 * ey, barW, 1.1 * ey);
+      ctx.fillRect(px - barW / 2, py - 7.6 * ey, barW, 1.1 * ey);
       ctx.fillStyle = b.hp < 40 ? '#ff0055' : '#06d6a0';
-      ctx.fillRect(px - barW / 2, py - 7.4 * ey, barW * Math.max(0, b.hp / b.maxHp), 1.1 * ey);
+      ctx.fillRect(px - barW / 2, py - 7.6 * ey, barW * Math.max(0, b.hp / b.maxHp), 1.1 * ey);
 
       ctx.font = 'bold 9px "JetBrains Mono", monospace';
       ctx.textAlign = 'center';
       ctx.fillStyle = b.hp < 40 ? '#ff4d6d' : '#ff99c8';
-      ctx.fillText(`♥ BIBBI ${Math.ceil(b.hp)}%`, px, py - 7.9 * ey);
+      ctx.fillText(`♥ BIBBI ${Math.ceil(b.hp)}%`, px, py - 8.1 * ey);
     }
 
-    // Omni-Tool Arm aiming toward mouse cursor
+    // Detailed 16-bit Omni-Tool Alchemy Blaster aiming toward mouse cursor
     const angle = Math.atan2(mouseWorld.wy - player.y, mouseWorld.wx - player.x);
     ctx.translate(px, py - 0.5 * ey);
     ctx.rotate(angle);
+    const AimFlipY = Math.abs(angle) > Math.PI / 2;
+    if (AimFlipY) ctx.scale(1, -1);
     const toolColor = TOOLS[player.selectedTool - 1]?.color || '#00f5d4';
-    ctx.fillStyle = '#adb5bd';
-    ctx.fillRect(0, -0.7 * ey, 3.6 * ex, 1.4 * ey);
-    ctx.fillStyle = toolColor;
-    ctx.fillRect(2.8 * ex, -1.0 * ey, 1.4 * ex, 2.0 * ey);
+    drawCompiledSprite(
+      ctx,
+      SPRITE_OMNI_TOOL,
+      5.0 * ux,
+      0,
+      ux * 0.82,
+      uy * 0.82,
+      {
+        O: '#141824',
+        S: '#adb5bd',
+        g: '#343a40',
+        T: toolColor,
+      },
+      false
+    );
     ctx.restore();
   }
 
@@ -983,8 +1254,20 @@ export class WorldRenderer {
 
       const px = vx * sx;
       const py = vy * sy;
-      ctx.fillStyle = p.color;
-      ctx.fillRect(px - 1.2 * ex, py - 1.2 * ey, 2.4 * ex, 2.4 * ey);
+      if (p.type === 'heat') {
+        // Multi-toned flamethrower fireball core + outer glow
+        ctx.fillStyle = p.color;
+        ctx.fillRect(px - 1.5 * ex, py - 1.5 * ey, 3.0 * ex, 3.0 * ey);
+        ctx.fillStyle = '#fff3b0';
+        ctx.fillRect(px - 0.65 * ex, py - 0.65 * ey, 1.3 * ex, 1.3 * ey);
+      } else {
+        ctx.fillStyle = '#141824';
+        ctx.fillRect(px - 1.45 * ex, py - 1.45 * ey, 2.9 * ex, 2.9 * ey);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(px - 1.1 * ex, py - 1.1 * ey, 2.2 * ex, 2.2 * ey);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(px - 0.45 * ex, py - 0.45 * ey, 0.9 * ex, 0.9 * ey);
+      }
     }
   }
 
