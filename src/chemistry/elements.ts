@@ -741,10 +741,10 @@ export const ELEMENTS: Record<ElementId, ElementDef> = {
     colorVariance: 15,
     thermalConductivity: 0.4,
     defaultTemp: 135,
-    freezePoint: 92,
+    freezePoint: 62,
     freezeInto: ElementId.WATER,
     radioactivity: 0,
-    description: 'Water vapor. Rises rapidly, builds pressure in enclosed chambers, and condenses back to Water below 92°C.'
+    description: 'Water vapor. Rises rapidly, builds pressure in enclosed chambers, and condenses back to Water below 62°C.'
   },
   [ElementId.SMOKE]: {
     id: ElementId.SMOKE,

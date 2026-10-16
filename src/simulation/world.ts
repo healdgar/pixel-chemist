@@ -10,6 +10,37 @@ import {
 } from '../chemistry/elements';
 import { SoundEngine } from '../audio/soundEngine';
 
+// Precomputed volumetric heat capacity (C_v = density * specific_heat) for realistic thermal inertia:
+// Massive liquids/solids (Lava, Water, Metals) retain heat against low-mass Air/Gas while Water's high specific heat rapidly quenches Lava.
+const THERMAL_CAPACITY = new Float32Array(64);
+for (const key of Object.keys(ELEMENTS)) {
+  const id = Number(key) as ElementId;
+  const def = ELEMENTS[id];
+  if (!def) continue;
+  if (def.state === 'empty') {
+    THERMAL_CAPACITY[id] = 1.2; // Low density air (~1.2 kg/m^3 * 1.0 kJ/kg*K)
+  } else if (def.state === 'gas') {
+    THERMAL_CAPACITY[id] = 2.5;
+  } else if (def.state === 'energy') {
+    THERMAL_CAPACITY[id] = 3200; // High-enthalpy plasma/fire/thermite heat source
+  } else if (
+    id === ElementId.WATER ||
+    id === ElementId.SALT_WATER ||
+    id === ElementId.HEAVY_WATER ||
+    id === ElementId.BIO_GEL ||
+    id === ElementId.ACID ||
+    id === ElementId.ALKALI
+  ) {
+    THERMAL_CAPACITY[id] = 4200; // Water has very high specific heat (4.184 kJ/kg*K)
+  } else if (id === ElementId.LIQUID_NITROGEN) {
+    THERMAL_CAPACITY[id] = 2600;
+  } else if (id === ElementId.LAVA || id === ElementId.MOLTEN_STEEL || id === ElementId.CORIUM) {
+    THERMAL_CAPACITY[id] = 3800; // High-mass molten silicate/metal
+  } else {
+    THERMAL_CAPACITY[id] = Math.max(800, Math.min(4500, def.density * 0.85));
+  }
+}
+
 export interface WorldSnapshot {
   grid: Uint8Array;
   bgGrid: Uint8Array;
@@ -409,11 +440,12 @@ export class WorldGrid {
       }
     }
 
-    // Active simulation window covers the visible viewport + margin
-    const minX = Math.max(2, Math.floor(camCenterX - 250));
-    const maxX = Math.min(this.width - 3, Math.ceil(camCenterX + 250));
-    const minY = Math.max(2, Math.floor(camCenterY - 165));
-    const maxY = Math.min(this.height - 3, Math.ceil(camCenterY + 165));
+    // Full-horizontal span every 4th tick (and ±340x±205 window on other ticks) so wide liquid basins level across the cavern without scanning the entire 1120x720 world every frame
+    const fullSpanTick = (this.tickCount & 3) === 0;
+    const minX = fullSpanTick ? 2 : Math.max(2, Math.floor(camCenterX - 340));
+    const maxX = fullSpanTick ? this.width - 3 : Math.min(this.width - 3, Math.ceil(camCenterX + 340));
+    const minY = Math.max(2, Math.floor(camCenterY - (fullSpanTick ? 260 : 205)));
+    const maxY = Math.min(this.height - 3, Math.ceil(camCenterY + (fullSpanTick ? 260 : 205)));
 
     const grid = this.grid;
     const flags = this.flags;
@@ -448,7 +480,7 @@ export class WorldGrid {
             if (pressure[i] < 0.1) pressure[i] = 0;
           }
           const t = temp[i];
-          if (t > 23 || t < 21) {
+          if (t > 32 || t < 10) {
             temp[i] = t + (22 - t) * 0.03;
           }
           continue;
@@ -477,26 +509,52 @@ export class WorldGrid {
         if (
           def.state === 'solid' &&
           (f & FLAG_TIME_ACCEL) === 0 &&
-          p < 1 &&
-          (def.meltPoint === undefined || temp[i] < def.meltPoint - 10) &&
-          (temp[i] > -105 || (f & FLAG_CRYO_BRITTLE) !== 0)
+          p < 1
         ) {
-          const dIdx = (this.tickCount + x * 3 + y * 7) & 3;
-          const nx = x + (dIdx === 2 ? -1 : dIdx === 3 ? 1 : 0);
-          const ny = y + (dIdx === 0 ? -1 : dIdx === 1 ? 1 : 0);
-          const ni = ny * W + nx;
-          const nel = grid[ni] as ElementId;
-          if ((nel === el || nel === ElementId.EMPTY) && pressure[ni] < 1) {
-            const tDiff = temp[ni] - temp[i];
-            if (tDiff < 1.2 && tDiff > -1.2) {
-              continue;
-            } else if (nel === el) {
-              const dt = tDiff * def.thermalConductivity * 0.36;
-              temp[i] += dt;
-              temp[ni] -= dt;
-              continue;
+          const t = temp[i];
+          if (el !== ElementId.ICE && t >= 8 && t <= 120 && ((x + y + this.tickCount) & 7) !== 0) {
+            continue;
+          }
+          if (
+            (def.meltPoint === undefined || t < def.meltPoint - 10) &&
+            (t > -105 || (f & FLAG_CRYO_BRITTLE) !== 0)
+          ) {
+            const dIdx = (this.tickCount + x * 3 + y * 7) & 3;
+            const nx = x + (dIdx === 2 ? -1 : dIdx === 3 ? 1 : 0);
+            const ny = y + (dIdx === 0 ? -1 : dIdx === 1 ? 1 : 0);
+            const ni = ny * W + nx;
+            const nel = grid[ni] as ElementId;
+            if ((nel === el || nel === ElementId.EMPTY) && pressure[ni] < 1) {
+              const tDiff = temp[ni] - t;
+              if (tDiff < 12 && tDiff > -12) {
+                continue;
+              } else if (nel === el) {
+                const dt = tDiff * def.thermalConductivity * 0.36;
+                temp[i] = t + dt;
+                temp[ni] -= dt;
+                continue;
+              }
             }
           }
+        }
+
+        // FAST-PATH 2b: Quiescent interior powder pixel buried inside a homogeneous pile (e.g. Sand, Sodium, Carbon, Thermite)
+        if (
+          def.state === 'powder' &&
+          f === 0 &&
+          p < 1 &&
+          el !== ElementId.URANIUM &&
+          el !== ElementId.CORIUM &&
+          el !== ElementId.BURNING_THERMITE &&
+          temp[i] < 90 &&
+          grid[i - 1] === el &&
+          grid[i + 1] === el &&
+          grid[i + W] !== ElementId.EMPTY &&
+          grid[i + W - 1] !== ElementId.EMPTY &&
+          grid[i + W + 1] !== ElementId.EMPTY &&
+          (grid[i - W] === el || grid[i - W] === ElementId.EMPTY)
+        ) {
+          continue;
         }
 
         // FAST-PATH 3: Quiescent interior liquid pixel buried inside a homogeneous pool/vat
@@ -510,8 +568,8 @@ export class WorldGrid {
           grid[i - W] === el
         ) {
           const t = temp[i];
-          const safeBoil = def.boilPoint === undefined || t < (el === ElementId.ACID || el === ElementId.ALKALI || el === ElementId.SALT_WATER ? 94 : def.boilPoint - 6);
-          const safeFreeze = def.freezePoint === undefined || t > def.freezePoint + 6;
+          const safeBoil = def.boilPoint === undefined || t < (el === ElementId.ACID || el === ElementId.ALKALI || el === ElementId.SALT_WATER ? 94 : def.boilPoint - 2);
+          const safeFreeze = def.freezePoint === undefined || t > def.freezePoint + 4;
           if (safeBoil && safeFreeze) {
             const dIdx = (this.tickCount + x * 3 + y * 7) & 3;
             const ni = dIdx < 2 ? i + (dIdx === 0 ? -W : W) : i + (dIdx === 2 ? -1 : 1);
@@ -621,13 +679,66 @@ export class WorldGrid {
       const nel = this.grid[ni] as ElementId;
       const ndef = ELEMENTS[nel];
 
-      // 1. Thermal Conduction
+      // 1. Thermal Conduction weighted by Volumetric Heat Capacity (C_v = density * specific_heat) & Harmonic Conductivity
       const tDiff = this.temp[ni] - this.temp[i];
       if (tDiff > 0.2 || tDiff < -0.2) {
-        const cond = (def.thermalConductivity + ndef.thermalConductivity) * 0.18;
-        const dt = tDiff * cond;
-        this.temp[i] += dt;
-        this.temp[ni] -= dt;
+        const k1 = def.thermalConductivity;
+        const k2 = ndef.thermalConductivity;
+        const kHarmonic = (2 * k1 * k2) / (k1 + k2 + 0.001);
+        const c1 = THERMAL_CAPACITY[el];
+        const c2 = THERMAL_CAPACITY[nel];
+        const invCSum = 1 / (c1 + c2);
+        const qFactor = tDiff * kHarmonic * 0.45 * invCSum;
+        const dt1 = qFactor * c2;
+        const dt2 = qFactor * c1;
+        // Cavern rock walls form an insulating geothermal boundary layer against magma, only quenching lava when chilled (< 5°C) or cooled by water
+        const iIsMagma = el === ElementId.LAVA || el === ElementId.MOLTEN_STEEL;
+        const niIsMagma = nel === ElementId.LAVA || nel === ElementId.MOLTEN_STEEL;
+        if (iIsMagma && ndef.state === 'solid' && this.temp[ni] > 5) {
+          this.temp[i] = Math.max(1085, this.temp[i] + dt1 * 0.15);
+          this.temp[ni] -= dt2 * 0.25;
+        } else if (niIsMagma && def.state === 'solid' && this.temp[i] > 5) {
+          this.temp[i] += dt1 * 0.25;
+          this.temp[ni] = Math.max(1085, this.temp[ni] - dt2 * 0.15);
+        } else {
+          this.temp[i] += dt1;
+          this.temp[ni] -= dt2;
+        }
+
+        // Latent heat of vaporization: water flashing to steam on contact with magma pulls intense latent heat out of the magma!
+        if (
+          (el === ElementId.LAVA && (nel === ElementId.WATER || nel === ElementId.SALT_WATER || nel === ElementId.HEAVY_WATER)) ||
+          (nel === ElementId.LAVA && (el === ElementId.WATER || el === ElementId.SALT_WATER || el === ElementId.HEAVY_WATER))
+        ) {
+          const lavaIdx = el === ElementId.LAVA ? i : ni;
+          const watIdx = el === ElementId.LAVA ? ni : i;
+          this.temp[lavaIdx] -= 480;
+          this.temp[watIdx] += 260;
+          // Conduct quench into the top 2 rows below the magma surface so a solid walkable Basalt bridge forms
+          const W = this.width;
+          if (lavaIdx + W < this.grid.length && this.grid[lavaIdx + W] === ElementId.LAVA) {
+            this.temp[lavaIdx + W] -= 320;
+          }
+          if (lavaIdx + W * 2 < this.grid.length && this.grid[lavaIdx + W * 2] === ElementId.LAVA) {
+            this.temp[lavaIdx + W * 2] -= 180;
+          }
+        } else if (
+          (el === ElementId.LAVA && nel === ElementId.STONE && ny < y && ny > 2) ||
+          (nel === ElementId.LAVA && el === ElementId.STONE && y < ny && y > 2)
+        ) {
+          // Wet basalt crust with water sitting on top continues conducting heat out of magma below up to ~4px bridge thickness
+          const stoneIdx = el === ElementId.STONE ? i : ni;
+          const lavaIdx = el === ElementId.LAVA ? i : ni;
+          const aboveStone = stoneIdx - this.width * 2;
+          if (
+            aboveStone > 0 &&
+            (this.grid[aboveStone] === ElementId.WATER ||
+              this.grid[aboveStone] === ElementId.SALT_WATER ||
+              this.grid[aboveStone] === ElementId.HEAVY_WATER)
+          ) {
+            this.temp[lavaIdx] -= 280;
+          }
+        }
       }
 
       // 2. Pressure Equalization
@@ -740,14 +851,15 @@ export class WorldGrid {
               transferred = true;
             }
           }
-          if (!transferred && el === ElementId.SALT_WATER && this.fastRand() < 0.35 * concFactor) {
+          const belowIsLava = y < this.height - 2 && this.grid[(y + 1) * this.width + x] === ElementId.LAVA;
+          if (!transferred && !belowIsLava && el === ElementId.SALT_WATER && this.fastRand() < 0.25 * concFactor) {
             // Boiling Brine precipitates crystalline Salt behind as Steam evaporates!
             this.setElement(x, y, ElementId.SALT, curTemp);
           } else {
-            this.setElement(x, y, transferred ? ElementId.STEAM : def.boilInto, curTemp);
+            this.setElement(x, y, transferred ? ElementId.STEAM : def.boilInto, Math.max(curTemp, effBoilPoint + 18));
           }
         } else {
-          this.setElement(x, y, def.boilInto, curTemp);
+          this.setElement(x, y, def.boilInto, Math.max(curTemp, effBoilPoint + 18));
         }
         this.pressure[i] += 18;
         return;
@@ -758,17 +870,21 @@ export class WorldGrid {
       const concFactor = isSolution ? this.getConcentration(i) / 100 : 1;
       const effFreezePoint = isSolution ? def.freezePoint * concFactor : def.freezePoint;
       if (curTemp <= effFreezePoint) {
-        this.setElement(x, y, def.freezeInto, curTemp);
+        this.setElement(x, y, def.freezeInto, Math.min(curTemp, effFreezePoint - 12));
         return;
       }
     }
 
-    // 8. Unanchored mid-air Ice crystals (e.g., frozen steam/mist droplets) fall under gravity instead of floating
-    if (el === ElementId.ICE && y < this.height - 2) {
+    // 8. Unanchored mid-air Ice crystals or isolated 1-pixel quenched Stone crusts fall under gravity instead of floating as mid-air dams
+    if ((el === ElementId.ICE || el === ElementId.STONE) && y < this.height - 2) {
       const belowIdx = (y + 1) * this.width + x;
       const belowEl = this.grid[belowIdx] as ElementId;
       const belowState = ELEMENTS[belowEl].state;
-      if (belowEl === ElementId.EMPTY || belowState === 'gas') {
+      if (
+        belowEl === ElementId.EMPTY ||
+        belowState === 'gas' ||
+        (el === ElementId.STONE && belowState === 'liquid' && belowEl !== ElementId.LAVA && belowEl !== ElementId.MERCURY)
+      ) {
         let solidNeighbors = 0;
         if (x > 1 && ELEMENTS[this.grid[i - 1] as ElementId].state === 'solid') solidNeighbors++;
         if (x < this.width - 2 && ELEMENTS[this.grid[i + 1] as ElementId].state === 'solid') solidNeighbors++;
@@ -1147,32 +1263,70 @@ export class WorldGrid {
           : el === ElementId.OIL || el === ElementId.BIO_GEL
             ? 4
             : 8;
-      // Hydrostatic head at the crest of a hump: liquid directly above (y - 1) within 4px of the free surface
+      // Hydrostatic head near the top of a mound: liquid directly above (y - 1) within 6px of a free surface
       const hasLiquidHead =
-        y > 4 &&
+        y > 6 &&
         ELEMENTS[grid[(y - 1) * W + x] as ElementId].state === 'liquid' &&
-        grid[(y - 4) * W + x] === ElementId.EMPTY;
+        grid[(y - 6) * W + x] !== el;
 
-      // Fast skip for flat-surface liquid pixels surrounded by the same liquid on both sides and below
-      if (
-        !hasLiquidHead &&
-        grid[i - 1] === el &&
-        grid[i + 1] === el &&
-        canDrop &&
-        grid[by * W + x - 1] === el &&
-        grid[by * W + x + 1] === el
-      ) {
-        if (isSol) {
-          const hi = i + hDir;
-          const c1 = this.getConcentration(i);
-          const c2 = this.getConcentration(hi);
-          if (Math.abs(c1 - c2) >= 2) {
-            const avg = (c1 + c2) >> 1;
-            this.life[i] = avg;
-            this.life[hi] = c1 + c2 - avg;
+      const aboveEl = y > 2 ? (grid[i - W] as ElementId) : el;
+      const isFreeSurface = y > 2 && (aboveEl === ElementId.EMPTY || ELEMENTS[aboveEl].state === 'gas');
+      const leftEl = grid[i - 1] as ElementId;
+      const rightEl = grid[i + 1] as ElementId;
+      const isCrestEdge =
+        leftEl === ElementId.EMPTY ||
+        rightEl === ElementId.EMPTY ||
+        ELEMENTS[leftEl].state === 'gas' ||
+        ELEMENTS[rightEl].state === 'gas';
+
+      // Hydrostatic Shelf & Mound Leveling: mound edges and sampled free-surface pixels sitting on liquid drain directly into any lower EMPTY/gas/lighter-liquid spot on row (y + 1) across wide basins!
+      if ((isCrestEdge || isFreeSurface) && canDrop) {
+        const belowEl = grid[by * W + x] as ElementId;
+        if (belowEl === el || (isMiscible && this.isMiscibleAqueous(belowEl))) {
+          if (isCrestEdge || ((x + this.tickCount) & 7) === 0) {
+            const shelfReach =
+              el === ElementId.LAVA || el === ElementId.MOLTEN_STEEL
+                ? 220
+                : el === ElementId.OIL || el === ElementId.BIO_GEL
+                  ? 260
+                  : 320;
+            for (let sPass = 0; sPass < 2; sPass++) {
+              const sDir = sPass === 0 ? hDir : -hDir;
+              for (let s = 1; s <= shelfReach; s++) {
+                const sx = x + sDir * s;
+                if (sx <= 1 || sx >= W - 2) break;
+                const sbi = by * W + sx;
+                const sbEl = grid[sbi] as ElementId;
+                if (
+                  sbEl === ElementId.EMPTY ||
+                  ELEMENTS[sbEl].state === 'gas' ||
+                  (sbEl !== el &&
+                    !(isMiscible && this.isMiscibleAqueous(sbEl)) &&
+                    this.canDisplace(i, effDensity, sbi))
+                ) {
+                  this.swap(i, sbi);
+                  return;
+                }
+                if (sbEl !== el && !(isMiscible && this.isMiscibleAqueous(sbEl))) {
+                  if (s > 8 || ELEMENTS[grid[y * W + sx] as ElementId].state === 'solid') break;
+                }
+              }
+            }
+          }
+          if (isFreeSurface && !isCrestEdge && grid[by * W + x - 1] === el && grid[by * W + x + 1] === el) {
+            if (isSol) {
+              const hi = i + hDir;
+              const c1 = this.getConcentration(i);
+              const c2 = this.getConcentration(hi);
+              if (Math.abs(c1 - c2) >= 2) {
+                const avg = (c1 + c2) >> 1;
+                this.life[i] = avg;
+                this.life[hi] = c1 + c2 - avg;
+              }
+            }
+            return;
           }
         }
-        return;
       }
 
       // Try primary random direction first, then fallback to opposite direction so slopes never stall 50% of ticks

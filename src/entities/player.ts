@@ -338,7 +338,11 @@ export class Player {
         if (!world.inBounds(px, py)) continue;
         const i = world.idx(px, py);
         const el = world.grid[i] as ElementId;
-        const t = world.temp[i];
+        const rawT = world.temp[i];
+        const t =
+          el === ElementId.EMPTY || el === ElementId.SMOKE
+            ? 22 + (rawT - 22) * 0.15
+            : rawT;
         if (t > maxTemp) maxTemp = t;
         if (t < minTemp) minTemp = t;
         radSum += world.radiation[i];
@@ -484,28 +488,24 @@ export class Player {
             });
           }
         } else {
-          // Continuous Flamethrower jet: 3 flame tongues per tick with nozzle velocity variance
-          const muzzleGx = Math.floor(spawnX);
-          const muzzleGy = Math.floor(spawnY);
-          if (_world.inBounds(muzzleGx, muzzleGy) && _world.getElement(muzzleGx, muzzleGy) === ElementId.EMPTY) {
-            _world.setElement(muzzleGx, muzzleGy, ElementId.FIRE, 1050, 12);
-          }
+          // Continuous Flamethrower jet: propellant exits nozzle and ignites at a safe standoff distance ahead!
           for (let k = 0; k < 3; k++) {
-            const angleOffset = (Math.random() - 0.5) * 0.26;
+            const angleOffset = (Math.random() - 0.5) * 0.24;
             const cosA = Math.cos(angleOffset);
             const sinA = Math.sin(angleOffset);
             const dirX = nx * cosA - ny * sinA;
             const dirY = nx * sinA + ny * cosA;
-            const speed = 4.6 + Math.random() * 2.1;
+            const forwardBoost = Math.max(0, this.vx * dirX + this.vy * dirY);
+            const speed = 5.2 + Math.random() * 2.0 + forwardBoost;
             projectiles.push({
-              x: spawnX + dirX * (k * 1.5),
-              y: spawnY + dirY * (k * 1.5),
-              vx: dirX * speed + this.vx * 0.25,
+              x: this.x + dirX * (11 + k * 2.0),
+              y: this.y + dirY * (11 + k * 2.0),
+              vx: dirX * speed,
               vy: dirY * speed,
               type: 'heat',
               color: k === 0 ? '#ffbe0b' : k === 1 ? '#fb5607' : '#ff595e',
               radius: 4,
-              ttl: 24 + ((Math.random() * 12) | 0),
+              ttl: 24 + ((Math.random() * 10) | 0),
               fromPlayer: true
             });
           }

@@ -259,25 +259,44 @@ export function updateProjectiles(
       const el = world.getElement(gx, gy);
       const state = ELEMENTS[el].state;
 
-      // Flamethrower in-flight stream: continuously deposits FIRE particles and heats cells along the beam!
+      // Flamethrower in-flight stream: ignites after a safe nozzle standoff distance so running while firing never burns the operator!
       if (p.type === 'heat' && s === 0) {
-        for (let ty = -2; ty <= 2; ty++) {
-          for (let tx = -2; tx <= 2; tx++) {
-            const cx = gx + tx;
-            const cy = gy + ty;
-            if (!world.inBounds(cx, cy)) continue;
-            const cIdx = world.idx(cx, cy);
-            world.temp[cIdx] = Math.min(3500, world.temp[cIdx] + 75);
-            if (tx * tx + ty * ty <= 2 && world.grid[cIdx] === ElementId.EMPTY && Math.random() < 0.48) {
-              world.setElement(cx, cy, ElementId.FIRE, 980, 10 + ((Math.random() * 14) | 0));
+        const distFromPlayer = p.fromPlayer && player ? Math.hypot(gx - player.x, gy - player.y) : 999;
+        if (distFromPlayer > 22) {
+          for (let ty = -2; ty <= 2; ty++) {
+            for (let tx = -2; tx <= 2; tx++) {
+              const cx = gx + tx;
+              const cy = gy + ty;
+              if (!world.inBounds(cx, cy)) continue;
+              const cIdx = world.idx(cx, cy);
+              const cEl = world.grid[cIdx] as ElementId;
+              if (
+                cEl !== ElementId.EMPTY &&
+                cEl !== ElementId.SMOKE &&
+                cEl !== ElementId.FIRE
+              ) {
+                world.temp[cIdx] = Math.min(3500, world.temp[cIdx] + 85);
+              }
+              if (
+                distFromPlayer > 48 &&
+                ty <= -1 &&
+                tx * tx + ty * ty <= 2 &&
+                cEl === ElementId.EMPTY &&
+                Math.random() < 0.35
+              ) {
+                world.setElement(cx, cy, ElementId.FIRE, 780, 3 + ((Math.random() * 3) | 0));
+              }
             }
           }
         }
       } else if (p.type === 'cryo' && s === 0) {
-        const cIdx = world.idx(gx, gy);
-        world.temp[cIdx] = Math.max(-260, world.temp[cIdx] - 55);
-        if (el === ElementId.EMPTY && Math.random() < 0.25) {
-          world.setElement(gx, gy, ElementId.NITROGEN_GAS, -180, 22);
+        const distFromPlayer = p.fromPlayer && player ? Math.hypot(gx - player.x, gy - player.y) : 999;
+        if (distFromPlayer > 18) {
+          const cIdx = world.idx(gx, gy);
+          world.temp[cIdx] = Math.max(-260, world.temp[cIdx] - 55);
+          if (el === ElementId.EMPTY && Math.random() < 0.25) {
+            world.setElement(gx, gy, ElementId.NITROGEN_GAS, -180, 22);
+          }
         }
       }
 
@@ -315,7 +334,7 @@ export function updateProjectiles(
           p.ttl < 78;
 
         if (speed < 0.75 || p.ttl <= 2 || sodiumWaterReaction) {
-          this_handleProjectileImpact(p, gx, gy, world, sound, bibbi);
+          this_handleProjectileImpact(p, gx, gy, world, sound, bibbi, player);
           hit = true;
           break;
         }
@@ -324,7 +343,7 @@ export function updateProjectiles(
 
       // Solids and powders stop projectiles and trigger full alchemical impact
       if (state === 'solid' || state === 'powder') {
-        this_handleProjectileImpact(p, gx, gy, world, sound, bibbi);
+        this_handleProjectileImpact(p, gx, gy, world, sound, bibbi, player);
         hit = true;
         break;
       }
@@ -420,7 +439,8 @@ function this_handleProjectileImpact(
   gy: number,
   world: WorldGrid,
   sound: SoundEngine,
-  bibbi?: BibbiState
+  bibbi?: BibbiState,
+  player?: Player
 ): void {
   // Check if an explosive/thermal blast impacts dangerously close to delicate Bibbi!
   if (bibbi && !bibbi.rescued && bibbi.hp > 0) {
@@ -458,9 +478,20 @@ function this_handleProjectileImpact(
       // Massive pressure spike! Repeated hits or hitting D2O/H2O/H2 reaches >= 5000 GPa -> FUSION!
       world.applyPressureImpulse(gx, gy, p.radius, 1950, sound);
       break;
-    case 'heat':
-      world.applyThermalBrush(gx, gy, p.radius, 185, ElementId.FIRE);
+    case 'heat': {
+      const distSqToPlayer =
+        p.fromPlayer && player
+          ? (gx - player.x) * (gx - player.x) + (gy - (player.y - 6)) * (gy - (player.y - 6))
+          : 9999;
+      world.applyThermalBrush(
+        gx,
+        gy,
+        p.radius,
+        185,
+        distSqToPlayer > 22 * 22 ? ElementId.FIRE : undefined,
+      );
       break;
+    }
     case 'cryo':
       world.applyThermalBrush(gx, gy, p.radius, -260, ElementId.LIQUID_NITROGEN);
       break;

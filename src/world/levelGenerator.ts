@@ -970,9 +970,11 @@ function generateOfficeTower(world: WorldGrid): LevelData {
   fillRect(380, 70, 420, 81, ElementId.THERMITE, 22, 0, 12); // Penthouse Thermite stockpile!
 
   // Floor 4 (y: 134..177): R&D Chemical Wet-Lab Floor (Acid & Sodium vats!)
-  fillRect(145, 162, 215, 177, ElementId.ACID, 28, 0, 12);
+  fillRect(143, 160, 217, 178, ElementId.GLASS, 22, 0, 12);
+  fillRect(145, 162, 215, 176, ElementId.ACID, 28, 0, 12);
   fillRect(340, 164, 385, 177, ElementId.SODIUM, 22, 0, 12);
-  fillRect(395, 162, 435, 177, ElementId.ALKALI, 22, 0, 12);
+  fillRect(393, 160, 437, 178, ElementId.GLASS, 22, 0, 12);
+  fillRect(395, 162, 435, 176, ElementId.ALKALI, 22, 0, 12);
 
   // Floor 3 (y: 182..225): Cryo-Cooled Mainframe Server Farm
   fillRect(135, 210, 240, 225, ElementId.LIQUID_NITROGEN, -196, 0, 4);
@@ -1397,7 +1399,7 @@ function generateMagmaTrench(world: WorldGrid): LevelData {
   carveRect(54, 34, 134, 82, 4);
 
   // Glass Observation Floor separating the Ocean from the Mid-Level Geothermal Cavern!
-  fillRect(160, 114, 400, 120, ElementId.GLASS, 25, 0, 15);
+  fillRect(160, 114, 400, 121, ElementId.GLASS, 25, 0, 15);
 
   // 3. Mid-Level Geothermal Mixing Cavern (x: 65..495, y: 121..225)
   carveRect(65, 121, 495, 225, 15);
@@ -1408,13 +1410,13 @@ function generateMagmaTrench(world: WorldGrid): LevelData {
   fillRect(340, 155, 385, 165, ElementId.CARBON, 30, 0, 15);
   fillRect(335, 166, 390, 169, ElementId.STEEL, 30, 0, 15);
 
-  // Molten Magma Rivers on the left and right sides of the Caldera!
-  fillRect(70, 195, 210, 224, ElementId.LAVA, 1480, 0, 15);
-  fillRect(350, 195, 490, 224, ElementId.LAVA, 1480, 0, 15);
-
   // 4. Deep Obsidian Caldera Core — BIBBI'S VAULT (x: 215..345, y: 235..336)
   carveRect(218, 230, 342, 336, 6, ElementId.TUNGSTEN, 5);
-  fillRect(260, 224, 300, 234, ElementId.STEEL, 45, 0, 6);
+  fillRect(260, 202, 300, 234, ElementId.STEEL, 45, 0, 6);
+
+  // Molten Magma Rivers on the left and right sides of the central Steel Vault Bridge!
+  fillRect(65, 204, 259, 224, ElementId.LAVA, 1480, 0, 15);
+  fillRect(301, 204, 495, 224, ElementId.LAVA, 1480, 0, 15);
 
   const bx = 280;
   const by = 300;
@@ -1442,7 +1444,7 @@ function generateMagmaTrench(world: WorldGrid): LevelData {
       {
         id: 'magma-2',
         x: 280,
-        y: 215,
+        y: 201,
         sector: 'Geothermal Magma Bridge',
         title: 'OBSIDIAN VAULT SEAL',
         logText:

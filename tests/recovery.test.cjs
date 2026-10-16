@@ -324,3 +324,116 @@ test('large 36,000-pixel liquid bodies and magma_trench fast-skip quiescent inte
   assert.ok(vatMsPerStep < 6.0, `Expected 36k liquid vat < 6.0 ms/step, got ${vatMsPerStep.toFixed(2)} ms/step`);
   assert.ok(avgMotionCalls < 6000, `Expected < 6000 motion calls/step out of 36,000 liquid pixels, got ${Math.round(avgMotionCalls)}`);
 });
+
+test('flamethrower standoff allows running forward while firing without burning the player', () => {
+  const game = createGame();
+  game.arena();
+
+  const res = game.run(`(() => {
+    const { ElementId } = require("./chemistry/elements");
+    const { updateProjectiles } = require("./entities/tools");
+    // Build a long floor and a flammable wood wall ahead
+    for (let x = 20; x < 350; x++) {
+      for (let y = 212; y <= 220; y++) {
+        world.setElement(x, y, ElementId.TUNGSTEN);
+      }
+    }
+    for (let x = 285; x <= 297; x++) {
+      for (let y = 175; y < 212; y++) {
+        world.setElement(x, y, ElementId.WOOD);
+      }
+    }
+    player.x = 60;
+    player.y = 200;
+    player.hp = 100;
+    player.selectedTool = 2;
+    keys.add("KeyD");
+
+    for (let t = 0; t < 60; t++) {
+      player.update(keys, world, sound);
+      player.fireTool(player.x + 80, player.y, false, projectiles, world, sound);
+      updateProjectiles(projectiles, world, sound, player, level.enemyUnits, level.bibbi);
+      world.step(player.x, player.y, sound);
+    }
+    keys.delete("KeyD");
+
+    let remainingWood = 0;
+    for (let x = 285; x <= 297; x++) {
+      for (let y = 175; y < 212; y++) {
+        if (world.getElement(x, y) === ElementId.WOOD) remainingWood++;
+      }
+    }
+    return { hp: player.hp, x: player.x, remainingWood, initialWood: 13 * 37 };
+  })()`);
+
+  assert.equal(res.hp, 100, `Expected player to take 0 self-damage while sprinting and firing flamethrower, got ${JSON.stringify(res)}`);
+  assert.ok(res.x > 130, `Expected player to advance forward while firing, got x=${res.x}`);
+  assert.ok(res.remainingWood < res.initialWood, `Expected flamethrower stream to ignite wood target ahead, got ${JSON.stringify(res)}`);
+});
+
+test('lava thermal mass keeps a wide lava mound hot in air while leveling flat, and water quenches it into basalt stone', () => {
+  const game = createGame();
+  game.arena();
+
+  const res = game.run(`(() => {
+    const { ElementId } = require("./chemistry/elements");
+    // 240px wide basin (x = 80..320, floor at y = 212)
+    for (let x = 76; x <= 324; x++) {
+      for (let y = 170; y <= 218; y++) {
+        if (y >= 212 || x <= 80 || x >= 320) {
+          world.setElement(x, y, ElementId.TUNGSTEN);
+        }
+      }
+    }
+    // Spawn a tall 80x25 mound of Lava (2,000 pixels) in the middle of the 239-wide basin
+    for (let x = 160; x < 240; x++) {
+      for (let y = 187; y < 212; y++) {
+        world.setElement(x, y, ElementId.LAVA, 1200);
+      }
+    }
+    for (let t = 0; t < 180; t++) {
+      world.step(200, 195, sound);
+    }
+    let lavaCount = 0;
+    let stoneInAir = 0;
+    let highestLavaY = 212;
+    let totalLavaTemp = 0;
+    for (let x = 81; x < 320; x++) {
+      for (let y = 170; y < 212; y++) {
+        const el = world.getElement(x, y);
+        if (el === ElementId.LAVA) {
+          lavaCount++;
+          totalLavaTemp += world.temp[y * world.width + x];
+          if (y < highestLavaY) highestLavaY = y;
+        } else if (el === ElementId.STONE) {
+          stoneInAir++;
+        }
+      }
+    }
+    const maxColumnHeight = 212 - highestLavaY;
+    const avgTempInAir = totalLavaTemp / Math.max(1, lavaCount);
+
+    // Now pour high-specific-heat Water across the central span to quench a Basalt STONE crust
+    for (let x = 140; x <= 260; x++) {
+      for (let y = 196; y <= 201; y++) {
+        world.setElement(x, y, ElementId.WATER, 20);
+      }
+    }
+    for (let t = 0; t < 45; t++) {
+      world.step(200, 195, sound);
+    }
+    let quenchedStone = 0;
+    for (let x = 81; x < 320; x++) {
+      for (let y = 170; y < 212; y++) {
+        if (world.getElement(x, y) === ElementId.STONE) quenchedStone++;
+      }
+    }
+    return { lavaCount, stoneInAir, maxColumnHeight, avgTempInAir, quenchedStone };
+  })()`);
+
+  assert.equal(res.stoneInAir, 0, `Expected 0 lava pixels to freeze against low-heat-capacity air, got ${JSON.stringify(res)}`);
+  assert.ok(res.avgTempInAir > 1100, `Expected lava thermal mass to stay > 1100C against air, got ${JSON.stringify(res)}`);
+  assert.ok(res.maxColumnHeight <= 9, `Expected 25-tall lava mound to level across 239-wide basin to <= 9 rows, got ${JSON.stringify(res)}`);
+  assert.ok(res.quenchedStone >= 80, `Expected water to quench lava surface into basalt stone, got ${JSON.stringify(res)}`);
+});
+
