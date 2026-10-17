@@ -107,7 +107,7 @@ export interface SectorZone {
   color: string;
 }
 
-export interface BibbiState {
+export interface DebbiState {
   x: number;
   y: number;
   hp: number;
@@ -130,7 +130,7 @@ export interface LevelData {
   mapInfo: MapInfo;
   spawnX: number;
   spawnY: number;
-  bibbi: BibbiState;
+  debbi: DebbiState;
   escapeVehicle: EscapeVehicle;
   terminals: LabTerminal[];
   turrets: LabTurret[];
@@ -204,7 +204,7 @@ function createHelpers(world: WorldGrid) {
     }
   };
 
-  const buildBibbiPod = (bx: number, by: number) => {
+  const buildDebbiPod = (bx: number, by: number) => {
     const sbx = Math.round(bx * S);
     const sby = Math.round(by * S);
     const rOuter = Math.round(16 * S);
@@ -235,7 +235,7 @@ function createHelpers(world: WorldGrid) {
     }
   };
 
-  return { W, H, S, carveRect, fillRect, buildBibbiPod, sealWorldBorders };
+  return { W, H, S, carveRect, fillRect, buildDebbiPod, sealWorldBorders };
 }
 
 function makeUnit(
@@ -663,8 +663,8 @@ function createJevForcesForMap(mapId: MapId): {
 function scaleLevelData(data: LevelData, S: number): LevelData {
   data.spawnX = Math.round(data.spawnX * S);
   data.spawnY = Math.round(data.spawnY * S);
-  data.bibbi.x = Math.round(data.bibbi.x * S);
-  data.bibbi.y = Math.round(data.bibbi.y * S);
+  data.debbi.x = Math.round(data.debbi.x * S);
+  data.debbi.y = Math.round(data.debbi.y * S);
   data.escapeVehicle.x = Math.round(data.escapeVehicle.x * S);
   data.escapeVehicle.y = Math.round(data.escapeVehicle.y * S);
   for (const t of data.terminals) {
@@ -736,7 +736,7 @@ export function generateLevel(world: WorldGrid, mapId: MapId = 'underground_lab'
 // MAP 1: ALPINE CRYO-VALLEY (OUTDOOR ENVIRONMENT)
 // ============================================================================
 function generateAlpineOutdoor(world: WorldGrid): LevelData {
-  const { W, H, S, carveRect, fillRect, buildBibbiPod, sealWorldBorders } = createHelpers(world);
+  const { W, H, S, carveRect, fillRect, buildDebbiPod, sealWorldBorders } = createHelpers(world);
   const mapInfo = MAP_CATALOG[0];
 
   // 1. Create open sky above rolling mountain terrain and subterranean limestone/basalt below
@@ -812,14 +812,14 @@ function generateAlpineOutdoor(world: WorldGrid): LevelData {
   fillRect(265, 190, 315, 194, ElementId.STEEL); // Bunker roof (melt with Thermite or rust!)
   fillRect(240, 242, 340, 258, ElementId.LAVA, 1400);
 
-  // Deep Mountain Vault holding Bibbi (Bottom-Center: x 220..360, y 275..336)
+  // Deep Mountain Vault holding Debbi (Bottom-Center: x 220..360, y 275..336)
   carveRect(225, 275, 355, 336, 6, ElementId.TUNGSTEN, 4);
   carveRect(175, 245, 232, 310, 4); // West cavern tunnel into Deep Vault
   fillRect(218, 275, 224, 315, ElementId.CRYO_GLASS, -180, FLAG_CRYO_BRITTLE);
 
   const bx = 290;
   const by = 306;
-  buildBibbiPod(bx, by);
+  buildDebbiPod(bx, by);
   // Build flat Steel Extraction Pad on West Alpine Ridge for the waiting Dropship
   carveRect(36, 78, 76, 107, 10);
   fillRect(38, 108, 74, 112, ElementId.STEEL, 15, 0, 10);
@@ -829,7 +829,7 @@ function generateAlpineOutdoor(world: WorldGrid): LevelData {
     mapInfo,
     spawnX: 85,
     spawnY: 95,
-    bibbi: { x: bx, y: by, hp: 100, maxHp: 100, carried: false, rescued: false, inDanger: false, cageIntactCount: 100 },
+    debbi: { x: bx, y: by, hp: 100, maxHp: 100, carried: false, rescued: false, inDanger: false, cageIntactCount: 100 },
     escapeVehicle: { x: 54, y: 100, name: 'Cryo-VTOL Dropship', type: 'dropship' },
     terminals: [
       {
@@ -839,7 +839,7 @@ function generateAlpineOutdoor(world: WorldGrid): LevelData {
         sector: 'Alpine Ridge Overlook',
         title: 'FIELD LOG: GLACIAL DAM',
         logText:
-          'We tracked Bibbi’s signal to a secret bunker buried beneath this mountain valley. To the east sits a massive frozen lake held back by a Glacial Ice Dam.',
+          'We tracked Debbi’s signal to a secret bunker buried beneath this mountain valley. To the east sits a massive frozen lake held back by a Glacial Ice Dam.',
         alchemyTip:
           'Melt the Ice Dam with your Thermal Lance [2 LMB] or blast it with Kinetic Pressure [1] to unleash a torrent of water down into the canyon!',
       },
@@ -861,7 +861,7 @@ function generateAlpineOutdoor(world: WorldGrid): LevelData {
         sector: 'Sub-Mountain Bunker Vault',
         title: 'BUNKER CONTAINMENT CONSOLE',
         logText:
-          'Bibbi’s stasis pod is right here inside the mountain core! Dissolve the cyan Chroniton Crystal ring to rescue her.',
+          'Debbi’s stasis pod is right here inside the mountain core! Dissolve the cyan Chroniton Crystal ring to rescue her.',
         alchemyTip:
           'Use Tool [3] (Time Accelerate), Tool [9] (Strong Force Unbinder), or Tool [9 RMB] (Quantum Tunneling) on the cyan crystal ring!',
       },
@@ -891,8 +891,8 @@ function generateAlpineOutdoor(world: WorldGrid): LevelData {
         color: '#72efdd',
       },
       {
-        name: 'MOUNTAIN CORE BUNKER — BIBBI’S VAULT',
-        subtitle: 'Breach the Sub-Mountain Bunker & Save Bibbi!',
+        name: 'MOUNTAIN CORE BUNKER — DEBBI’S VAULT',
+        subtitle: 'Breach the Sub-Mountain Bunker & Save Debbi!',
         x1: 0,
         y1: 269,
         x2: 560,
@@ -907,7 +907,7 @@ function generateAlpineOutdoor(world: WorldGrid): LevelData {
 // MAP 2: OMNICORP SKYSCRAPER (CORPORATE OFFICE BUILDING)
 // ============================================================================
 function generateOfficeTower(world: WorldGrid): LevelData {
-  const { W, H, S, carveRect, fillRect, buildBibbiPod, sealWorldBorders } = createHelpers(world);
+  const { W, H, S, carveRect, fillRect, buildDebbiPod, sealWorldBorders } = createHelpers(world);
   const mapInfo = MAP_CATALOG[1];
 
   // 1. Fill entire map with Night City Skyline open air (bgGrid = 11), with street concrete at the very bottom
@@ -981,20 +981,20 @@ function generateOfficeTower(world: WorldGrid): LevelData {
   fillRect(320, 210, 425, 225, ElementId.HEAVY_WATER, 20, 0, 5);
   fillRect(355, 214, 385, 224, ElementId.URANIUM, 160, 0, 5);
 
-  // Basement Sub-Level (y: 278..324): Executive Boardroom Vault where Bibbi is held!
+  // Basement Sub-Level (y: 278..324): Executive Boardroom Vault where Debbi is held!
   fillRect(220, 275, 226, 323, ElementId.TUNGSTEN, 22, 0, 6);
   fillRect(334, 275, 340, 323, ElementId.TUNGSTEN, 22, 0, 6);
 
   const bx = 280;
   const by = 304;
-  buildBibbiPod(bx, by);
+  buildDebbiPod(bx, by);
   sealWorldBorders();
 
   return {
     mapInfo,
     spawnX: 82,
     spawnY: 68, // Spawn on the Penthouse Helipad next to the Stealth Chopper!
-    bibbi: { x: bx, y: by, hp: 100, maxHp: 100, carried: false, rescued: false, inDanger: false, cageIntactCount: 100 },
+    debbi: { x: bx, y: by, hp: 100, maxHp: 100, carried: false, rescued: false, inDanger: false, cageIntactCount: 100 },
     escapeVehicle: { x: 58, y: 72, name: 'Stealth Extraction Chopper', type: 'chopper' },
     terminals: [
       {
@@ -1004,7 +1004,7 @@ function generateOfficeTower(world: WorldGrid): LevelData {
         sector: 'Penthouse Helipad (6th Floor)',
         title: 'OMNICORP TOWER INFILTRATION',
         logText:
-          'You landed on the 6th-floor Penthouse Helipad of OmniCorp Tower! Bibbi is locked in the Sub-Basement Vault 6 stories below. You can shatter the exterior glass windows, take the central elevator shaft, or melt straight down through every floor!',
+          'You landed on the 6th-floor Penthouse Helipad of OmniCorp Tower! Debbi is locked in the Sub-Basement Vault 6 stories below. You can shatter the exterior glass windows, take the central elevator shaft, or melt straight down through every floor!',
         alchemyTip:
           'Ignite the Penthouse Thermite cache on the right side of Floor 6 with Heat [2 LMB] to burn at 2850°C straight down through all 6 office floors!',
       },
@@ -1026,9 +1026,9 @@ function generateOfficeTower(world: WorldGrid): LevelData {
         sector: 'Sub-Basement Executive Vault',
         title: 'CEO CONTAINMENT TERMINAL',
         logText:
-          'Bibbi is suspended inside the Sub-Basement Chroniton Vault! Dissolve the cyan Chroniton Crystal ring to complete the skyscraper rescue.',
+          'Debbi is suspended inside the Sub-Basement Chroniton Vault! Dissolve the cyan Chroniton Crystal ring to complete the skyscraper rescue.',
         alchemyTip:
-          'Use Tool [3] (Time Accelerate) or Tool [9] (Strong Force / Quantum Tunneling) on Bibbi’s stasis pod!',
+          'Use Tool [3] (Time Accelerate) or Tool [9] (Strong Force / Quantum Tunneling) on Debbi’s stasis pod!',
       },
     ],
     turrets: [
@@ -1057,7 +1057,7 @@ function generateOfficeTower(world: WorldGrid): LevelData {
       },
       {
         name: 'LOBBY & SUB-BASEMENT VAULT (FLOORS 1–2)',
-        subtitle: 'Breach the CEO’s Tungsten Vault & Rescue Bibbi!',
+        subtitle: 'Breach the CEO’s Tungsten Vault & Rescue Debbi!',
         x1: 0,
         y1: 231,
         x2: 560,
@@ -1072,7 +1072,7 @@ function generateOfficeTower(world: WorldGrid): LevelData {
 // MAP 3: CASTLE RAVENSCROFT (MEDIEVAL ALCHEMIST'S KEEP)
 // ============================================================================
 function generateCastleKeep(world: WorldGrid): LevelData {
-  const { W, H, S, carveRect, fillRect, buildBibbiPod, sealWorldBorders } = createHelpers(world);
+  const { W, H, S, carveRect, fillRect, buildDebbiPod, sealWorldBorders } = createHelpers(world);
   const mapInfo = MAP_CATALOG[2];
 
   // 1. Open Moonlit Sky above y = 185, bedrock stone below y = 185
@@ -1144,14 +1144,14 @@ function generateCastleKeep(world: WorldGrid): LevelData {
   fillRect(340, 272, 435, 293, ElementId.LAVA, 1450, 0, 13);
   fillRect(355, 245, 405, 255, ElementId.THERMITE, 25, 0, 13);
 
-  // Deep Royal Crypt where Bibbi is imprisoned (x: 225..335, y: 245..336)
+  // Deep Royal Crypt where Debbi is imprisoned (x: 225..335, y: 245..336)
   carveRect(225, 245, 335, 336, 13, ElementId.TUNGSTEN, 4);
   carveRect(215, 265, 240, 290, 13);
   fillRect(222, 265, 228, 290, ElementId.STEEL, 20, 0, 13);
 
   const bx = 280;
   const by = 304;
-  buildBibbiPod(bx, by);
+  buildDebbiPod(bx, by);
   fillRect(18, 184, 54, 188, ElementId.STEEL, 20, 0, 10);
   sealWorldBorders();
 
@@ -1159,7 +1159,7 @@ function generateCastleKeep(world: WorldGrid): LevelData {
     mapInfo,
     spawnX: 52,
     spawnY: 170,
-    bibbi: { x: bx, y: by, hp: 100, maxHp: 100, carried: false, rescued: false, inDanger: false, cageIntactCount: 100 },
+    debbi: { x: bx, y: by, hp: 100, maxHp: 100, carried: false, rescued: false, inDanger: false, cageIntactCount: 100 },
     escapeVehicle: { x: 28, y: 176, name: 'Alchemical Sky-Skiff', type: 'airship' },
     terminals: [
       {
@@ -1191,7 +1191,7 @@ function generateCastleKeep(world: WorldGrid): LevelData {
         sector: 'Deep Royal Crypt',
         title: 'CRYPT STASIS ALTAR',
         logText:
-          'Bibbi is held inside the Royal Crypt beneath the Great Hall! Dissolve the Chroniton Crystal ring to rescue her.',
+          'Debbi is held inside the Royal Crypt beneath the Great Hall! Dissolve the Chroniton Crystal ring to rescue her.',
         alchemyTip:
           'Use Tool [3] (Time Accelerate) or Tool [9] (Strong Force / Quantum Tunneling) to shatter the stasis crystal!',
       },
@@ -1222,8 +1222,8 @@ function generateCastleKeep(world: WorldGrid): LevelData {
         color: '#ff9f1c',
       },
       {
-        name: 'TORCH-LIT DUNGEONS & ROYAL CRYPT — BIBBI’S VAULT',
-        subtitle: 'Brine Cellar, Dragon’s Forge & Bibbi’s Stasis Altar',
+        name: 'TORCH-LIT DUNGEONS & ROYAL CRYPT — DEBBI’S VAULT',
+        subtitle: 'Brine Cellar, Dragon’s Forge & Debbi’s Stasis Altar',
         x1: 0,
         y1: 216,
         x2: 560,
@@ -1238,7 +1238,7 @@ function generateCastleKeep(world: WorldGrid): LevelData {
 // MAP 4: ORBITAL STATION ICARUS-9 (LOW-GRAVITY SPACE STATION)
 // ============================================================================
 function generateSpaceStation(world: WorldGrid): LevelData {
-  const { W, H, carveRect, fillRect, buildBibbiPod, sealWorldBorders } = createHelpers(world);
+  const { W, H, carveRect, fillRect, buildDebbiPod, sealWorldBorders } = createHelpers(world);
   const mapInfo = MAP_CATALOG[3];
 
   // 1. Fill entire world with Deep Space Vacuum & Starfield (bgGrid = 14)
@@ -1286,21 +1286,21 @@ function generateSpaceStation(world: WorldGrid): LevelData {
   fillRect(439, 188, 481, 206, ElementId.HEAVY_WATER, 22, 0, 5);
   fillRect(439, 169, 481, 187, ElementId.DEUTERIUM, 25, 0, 5);
 
-  // 6. Lower Artificial-Gravity Command Core — BIBBI'S ORBITAL POD (DOWN: x: 205..355, y: 245..336)
+  // 6. Lower Artificial-Gravity Command Core — DEBBI'S ORBITAL POD (DOWN: x: 205..355, y: 245..336)
   carveRect(268, 216, 292, 250, 6, ElementId.TUNGSTEN, 3);
   fillRect(268, 232, 292, 238, ElementId.TUNGSTEN, 22, 0, 6);
   carveRect(208, 246, 352, 336, 6, ElementId.TUNGSTEN, 5);
 
   const bx = 280;
   const by = 300;
-  buildBibbiPod(bx, by);
+  buildDebbiPod(bx, by);
   sealWorldBorders();
 
   return {
     mapInfo,
     spawnX: 102,
     spawnY: 172,
-    bibbi: { x: bx, y: by, hp: 100, maxHp: 100, carried: false, rescued: false, inDanger: false, cageIntactCount: 100 },
+    debbi: { x: bx, y: by, hp: 100, maxHp: 100, carried: false, rescued: false, inDanger: false, cageIntactCount: 100 },
     escapeVehicle: { x: 68, y: 175, name: 'Escape Shuttle Hermes-7', type: 'shuttle' },
     terminals: [
       {
@@ -1332,7 +1332,7 @@ function generateSpaceStation(world: WorldGrid): LevelData {
         sector: 'Lower Command Core Vault',
         title: 'ORBITAL STASIS POD',
         logText:
-          'Bibbi is suspended inside the Orbital Command Vault! Breach the Tungsten hatch with Weak Force [8] or Quantum Tunneling [9] and dissolve her Chroniton Pod.',
+          'Debbi is suspended inside the Orbital Command Vault! Breach the Tungsten hatch with Weak Force [8] or Quantum Tunneling [9] and dissolve her Chroniton Pod.',
         alchemyTip:
           'Use Tool [3] (Time Accelerate) or Tool [9] (Strong Force / Quantum Tunneling) on the cyan Chroniton ring!',
       },
@@ -1362,7 +1362,7 @@ function generateSpaceStation(world: WorldGrid): LevelData {
         color: '#4cc9f0',
       },
       {
-        name: 'ORBITAL COMMAND CORE — BIBBI’S VAULT',
+        name: 'ORBITAL COMMAND CORE — DEBBI’S VAULT',
         subtitle: 'Tungsten-Armored Deep Space Vault',
         x1: 0,
         y1: 236,
@@ -1378,7 +1378,7 @@ function generateSpaceStation(world: WorldGrid): LevelData {
 // MAP 5: ABYSSAL CALDERA (SUB-OCEANIC VOLCANO & MAGMA TRENCH)
 // ============================================================================
 function generateMagmaTrench(world: WorldGrid): LevelData {
-  const { W, H, S, carveRect, fillRect, buildBibbiPod, sealWorldBorders } = createHelpers(world);
+  const { W, H, S, carveRect, fillRect, buildDebbiPod, sealWorldBorders } = createHelpers(world);
   const mapInfo = MAP_CATALOG[4];
 
   // 1. Fill with volcanic basalt stone (bgGrid = 15)
@@ -1410,7 +1410,7 @@ function generateMagmaTrench(world: WorldGrid): LevelData {
   fillRect(340, 155, 385, 165, ElementId.CARBON, 30, 0, 15);
   fillRect(335, 166, 390, 169, ElementId.STEEL, 30, 0, 15);
 
-  // 4. Deep Obsidian Caldera Core — BIBBI'S VAULT (x: 215..345, y: 235..336)
+  // 4. Deep Obsidian Caldera Core — DEBBI'S VAULT (x: 215..345, y: 235..336)
   carveRect(218, 230, 342, 336, 6, ElementId.TUNGSTEN, 5);
   fillRect(260, 202, 300, 234, ElementId.STEEL, 45, 0, 6);
 
@@ -1420,14 +1420,14 @@ function generateMagmaTrench(world: WorldGrid): LevelData {
 
   const bx = 280;
   const by = 300;
-  buildBibbiPod(bx, by);
+  buildDebbiPod(bx, by);
   sealWorldBorders();
 
   return {
     mapInfo,
     spawnX: 98,
     spawnY: 65,
-    bibbi: { x: bx, y: by, hp: 100, maxHp: 100, carried: false, rescued: false, inDanger: false, cageIntactCount: 100 },
+    debbi: { x: bx, y: by, hp: 100, maxHp: 100, carried: false, rescued: false, inDanger: false, cageIntactCount: 100 },
     escapeVehicle: { x: 68, y: 72, name: 'Deep-Sea Bathysphere', type: 'submersible' },
     terminals: [
       {
@@ -1448,7 +1448,7 @@ function generateMagmaTrench(world: WorldGrid): LevelData {
         sector: 'Geothermal Magma Bridge',
         title: 'OBSIDIAN VAULT SEAL',
         logText:
-          'Bibbi’s vault lies directly beneath this Steel seal. Watch out for steam explosions when water contacts magma!',
+          'Debbi’s vault lies directly beneath this Steel seal. Watch out for steam explosions when water contacts magma!',
         alchemyTip:
           'Rust the wet Steel vault seal with Time Acceleration [3 LMB] or phase straight through with Quantum Tunneling [Q / B]!',
       },
@@ -1477,7 +1477,7 @@ function generateMagmaTrench(world: WorldGrid): LevelData {
         color: '#ff6b6b',
       },
       {
-        name: 'OBSIDIAN CALDERA CORE — BIBBI’S VAULT',
+        name: 'OBSIDIAN CALDERA CORE — DEBBI’S VAULT',
         subtitle: 'Deep Geothermal Containment Chamber',
         x1: 0,
         y1: 229,
@@ -1493,7 +1493,7 @@ function generateMagmaTrench(world: WorldGrid): LevelData {
 // MAP 6: AETHELGARD SUB-ATOMIC LAB (ORIGINAL 9-SECTOR UNDERGROUND FACILITY)
 // ============================================================================
 export function generateUndergroundLab(world: WorldGrid): LevelData {
-  const { W, H, S, carveRect, fillRect, buildBibbiPod } = createHelpers(world);
+  const { W, H, S, carveRect, fillRect, buildDebbiPod } = createHelpers(world);
   const mapInfo = MAP_CATALOG[5];
 
   for (let y = 0; y < H; y++) {
@@ -1622,7 +1622,7 @@ export function generateUndergroundLab(world: WorldGrid): LevelData {
   carveRect(328, 290, 366, 320, 5, ElementId.TUNGSTEN, 3);
   fillRect(344, 290, 349, 320, ElementId.GLUON_BARRIER, 22, FLAG_GLUON_LOCKED);
 
-  // SECTOR 8: DEEP QUANTUM CORE — BIBBI'S CONTAINMENT VAULT
+  // SECTOR 8: DEEP QUANTUM CORE — DEBBI'S CONTAINMENT VAULT
   carveRect(268, 206, 292, 245, 6, ElementId.TUNGSTEN, 3);
   fillRect(268, 224, 292, 230, ElementId.TUNGSTEN);
   carveRect(226, 242, 334, 336, 6, ElementId.TUNGSTEN, 5);
@@ -1633,13 +1633,13 @@ export function generateUndergroundLab(world: WorldGrid): LevelData {
 
   const bx = 280;
   const by = 304;
-  buildBibbiPod(bx, by);
+  buildDebbiPod(bx, by);
 
   return {
     mapInfo,
     spawnX: 250,
     spawnY: 60,
-    bibbi: { x: bx, y: by, hp: 100, maxHp: 100, carried: false, rescued: false, inDanger: false, cageIntactCount: 100 },
+    debbi: { x: bx, y: by, hp: 100, maxHp: 100, carried: false, rescued: false, inDanger: false, cageIntactCount: 100 },
     escapeVehicle: { x: 280, y: 42, name: 'Subterranean Extraction Pod', type: 'drillpod' },
     terminals: [
       {
@@ -1649,7 +1649,7 @@ export function generateUndergroundLab(world: WorldGrid): LevelData {
         sector: 'Sector 0: Surface Breach Atrium',
         title: 'DR. VANCE PERSONAL LOG #01',
         logText:
-          'Director Kael locked my daughter Bibbi inside the Deep Quantum Vault at the bottom of the facility. My Sub-Atomic Omni-Tool can manipulate heat, cold, pressure, chemicals, radiation, and the fundamental forces.',
+          'Director Kael locked my daughter Debbi inside the Deep Quantum Vault at the bottom of the facility. My Sub-Atomic Omni-Tool can manipulate heat, cold, pressure, chemicals, radiation, and the fundamental forces.',
         alchemyTip:
           'Explore LEFT (Cryo Lab), RIGHT (Acid Refinery), UP (Supply Loft), or DOWN (Foundry Shaft).',
       },
@@ -1720,15 +1720,15 @@ export function generateUndergroundLab(world: WorldGrid): LevelData {
           'Use Tool [9 RMB / Key Q] for Quantum Tunneling, Tool [9 LMB] for Strong Force Unbinding, or Tool [8] to transmute Tungsten into Sodium!',
       },
       {
-        id: 'term-bibbi',
+        id: 'term-debbi',
         x: 244,
         y: 280,
         sector: 'Sector 8: Deep Quantum Containment Vault',
-        title: 'BIBBI STASIS POD TELEMETRY',
+        title: 'DEBBI STASIS POD TELEMETRY',
         logText:
-          'Dissolve the cyan Chroniton Crystal ring using the Chroniton Time Beam [3], Strong Force Unbinder [9], or Quantum Phase Beam [9] to free Bibbi!',
+          'Dissolve the cyan Chroniton Crystal ring using the Chroniton Time Beam [3], Strong Force Unbinder [9], or Quantum Phase Beam [9] to free Debbi!',
         alchemyTip:
-          'Breach the cyan Chroniton Crystal dome around Bibbi and walk up to her to rescue her!',
+          'Breach the cyan Chroniton Crystal dome around Debbi and walk up to her to rescue her!',
       },
     ],
     turrets: [
@@ -1813,8 +1813,8 @@ export function generateUndergroundLab(world: WorldGrid): LevelData {
         color: '#ffbe0b',
       },
       {
-        name: 'SECTOR 8: DEEP QUANTUM CORE — BIBBI’S VAULT',
-        subtitle: 'Primary Objective: Dissolve the Chroniton Stasis Pod & Save Bibbi!',
+        name: 'SECTOR 8: DEEP QUANTUM CORE — DEBBI’S VAULT',
+        subtitle: 'Primary Objective: Dissolve the Chroniton Stasis Pod & Save Debbi!',
         x1: 216,
         y1: 235,
         x2: 344,

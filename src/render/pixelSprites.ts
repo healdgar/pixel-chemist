@@ -1,4 +1,4 @@
-// High-resolution 16-bit pixel art sprites & RLE span renderer for Pixel Chemist: Saving Bibbi
+// High-resolution 16-bit pixel art sprites & RLE span renderer for Pixel Chemist
 // Extracted and quantized directly from the generated pixel-art design sheets.
 
 export interface PixelSpan {
@@ -178,7 +178,7 @@ export const SPRITE_OMNI_TOOL = compileSprite(
   }
 );
 
-export const SPRITE_BIBBI = compileSprite(
+export const SPRITE_DEBBI = compileSprite(
   [
     '...i8ce..........h8ck...',
     '..848c38........g84888f.',
@@ -245,7 +245,7 @@ export const SPRITE_BIBBI = compileSprite(
   }
 );
 
-export const SPRITE_BIBBI_PIGGYBACK = compileSprite(
+export const SPRITE_DEBBI_PIGGYBACK = compileSprite(
   [
     '...4be........gbbf..',
     '.e3117b.......73334.',

@@ -24,7 +24,7 @@ export const JEV_LEVER_NAMES = [
   '5: Local Temperature Anomaly (-200°C..1500°C)',
   '6: Local Pressure Shockwave (0..5000 GPa)',
   '7: Local Radiation & Neutron Flux (mSv)',
-  '8: Bibbi Stasis Vault Proximity (0..1)',
+  '8: Debbi Stasis Vault Proximity (0..1)',
   '9: Facility Line-of-Sight Lock Ratio',
   '10: Player Standing in Conductive/Wet Medium',
   '11: Facility Unit Casualty & Breach Rate',
@@ -367,14 +367,14 @@ export class JevNeuralBrain {
       x[5] = activeToolGroup === 0 ? 0.65 + Math.random() * 0.35 : Math.random() * 0.5; // Temp
       x[6] = Math.random() * 0.6; // Pressure
       x[7] = activeToolGroup === 3 ? 0.6 + Math.random() * 0.4 : Math.random() * 0.25; // Radiation
-      x[8] = Math.random(); // Bibbi Vault Proximity
+      x[8] = Math.random(); // Debbi Vault Proximity
       x[9] = Math.random() < 0.65 ? 0.4 + Math.random() * 0.6 : 0.0; // LoS ratio
       x[10] = activeToolGroup === 1 || Math.random() < 0.3 ? 1.0 : 0.0; // Player wet/conductive
       x[11] = Math.random() * 0.8; // Unit casualty rate
 
       // Compute optimal ground-truth counter-strategy from the game's physics & alchemy levers:
       // - If no LoS and low vault proximity -> SECTOR_PATROL (0), kinetic (0)
-      // - If player is close to Bibbi's vault (x[8] > 0.72) -> FACILITY_HAZARD_FLUSH (5), acid (2)
+      // - If player is close to Debbi's vault (x[8] > 0.72) -> FACILITY_HAZARD_FLUSH (5), acid (2)
       // - If player is wet/using water (x[10] > 0.5 or x[1] > 0.5) -> AERIAL_SODIUM_BOMB (4), sodium_bomb (4) (Na + H2O = BOOM!)
       // - If player is using Thermal/Thermite or high temp (x[0] > 0.5 or x[5] > 0.65) -> COUNTER_ALCHEMY_CRYO (2), cryo (1) (quench + cryo-brittle!)
       // - If player is using Corrosive/Quantum (x[2] > 0.5 or x[3] > 0.5) -> COUNTER_ALCHEMY_ACID (3), plasma (3)
@@ -578,7 +578,7 @@ export class JevDirector {
 
   // State tracking between decisions to compute live RL rewards!
   private prevPlayerHp: number = 100;
-  private prevDistToBibbi: number = 500;
+  private prevDistToDebbi: number = 500;
   private prevActiveUnitCount: number = 0;
 
   public createSnapshot() {
@@ -590,7 +590,7 @@ export class JevDirector {
       counterAlchemyProb: this.counterAlchemyProb, urgencyScore: this.urgencyScore,
       lastBroadcast: this.lastBroadcast, decisionTickCounter: this.decisionTickCounter,
       reinforcementCooldown: this.reinforcementCooldown,
-      prevPlayerHp: this.prevPlayerHp, prevDistToBibbi: this.prevDistToBibbi,
+      prevPlayerHp: this.prevPlayerHp, prevDistToDebbi: this.prevDistToDebbi,
       prevActiveUnitCount: this.prevActiveUnitCount,
     };
   }
@@ -610,7 +610,7 @@ export class JevDirector {
     this.decisionTickCounter = 0;
     this.reinforcementCooldown = 200;
     this.prevPlayerHp = 100;
-    this.prevDistToBibbi = 600;
+    this.prevDistToDebbi = 600;
     this.prevActiveUnitCount = 0;
     this.lastBroadcast = `J.E.V. [${mapName.toUpperCase()}]: Neural Policy active (${this.brain.trainedEpisodes} eps). Guards, Drones & Mechs online.`;
   }
@@ -635,7 +635,7 @@ export class JevDirector {
     world: WorldGrid,
     player: Player,
     units: EnemyUnit[],
-    bibbiPos: { x: number; y: number },
+    debbiPos: { x: number; y: number },
     loSCount: number
   ): Float32Array {
     const levers = new Float32Array(JevNeuralBrain.IN_DIM);
@@ -684,9 +684,9 @@ export class JevDirector {
     // Lever 7: Local Radiation & Neutron Flux
     levers[7] = Math.max(0, Math.min(1, (radSum + player.radiationDose * 0.5) / 50));
 
-    // Lever 8: Bibbi Stasis Vault Proximity (1.0 = right at the vault, 0.0 = far away)
-    const distToBibbi = Math.hypot(player.x - bibbiPos.x, player.y - bibbiPos.y);
-    levers[8] = Math.max(0, Math.min(1, 1.0 - distToBibbi / 750));
+    // Lever 8: Debbi Stasis Vault Proximity (1.0 = right at the vault, 0.0 = far away)
+    const distToDebbi = Math.hypot(player.x - debbiPos.x, player.y - debbiPos.y);
+    levers[8] = Math.max(0, Math.min(1, 1.0 - distToDebbi / 750));
 
     // Lever 9: Line-of-Sight Lock Ratio
     levers[9] = Math.max(0, Math.min(1, loSCount / 3));
@@ -714,7 +714,7 @@ export class JevDirector {
     units: EnemyUnit[],
     defenses: FacilityDefense[],
     projectiles: Projectile[],
-    bibbiPos: { x: number; y: number; rescued: boolean },
+    debbiPos: { x: number; y: number; rescued: boolean },
     sound: SoundEngine,
     tick: number
   ): void {
@@ -744,7 +744,7 @@ export class JevDirector {
     // 3. Every 36 ticks (~0.6s), compute online RL reward from previous action and run J.E.V. Neural Forward Pass!
     if (this.decisionTickCounter >= 36) {
       this.decisionTickCounter = 0;
-      const distToBibbi = Math.hypot(player.x - bibbiPos.x, player.y - bibbiPos.y);
+      const distToDebbi = Math.hypot(player.x - debbiPos.x, player.y - debbiPos.y);
       const totalLoS = unitLoSCount + defenseTriggeredLoS;
 
       if (totalLoS > 0) {
@@ -758,7 +758,7 @@ export class JevDirector {
       // Compute Online Reinforcement Learning Reward if J.E.V. was engaging the player:
       if (this.prevActiveUnitCount > 0 && (totalLoS > 0 || this.alertLevel > 30)) {
         const playerDmgDealt = Math.max(0, this.prevPlayerHp - player.hp);
-        const vaultPushback = Math.max(-15, Math.min(15, distToBibbi - this.prevDistToBibbi)) * 0.04;
+        const vaultPushback = Math.max(-15, Math.min(15, distToDebbi - this.prevDistToDebbi)) * 0.04;
         const unitLosses = Math.max(0, this.prevActiveUnitCount - activeUnitCount);
         const reward = playerDmgDealt * 0.25 + vaultPushback - unitLosses * 1.1;
         if (Math.abs(reward) > 0.02) {
@@ -767,11 +767,11 @@ export class JevDirector {
       }
 
       this.prevPlayerHp = player.hp;
-      this.prevDistToBibbi = distToBibbi;
+      this.prevDistToDebbi = distToDebbi;
       this.prevActiveUnitCount = activeUnitCount;
 
       // Extract the 12 game levers & query J.E.V.'s trained neural network!
-      const levers = this.extractGameLevers(world, player, units, bibbiPos, totalLoS);
+      const levers = this.extractGameLevers(world, player, units, debbiPos, totalLoS);
       const out = this.brain.evaluate(levers);
 
       const prevDir = this.currentDirective;

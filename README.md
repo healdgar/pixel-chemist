@@ -1,10 +1,10 @@
-# Pixel Chemist: Saving Bibbi (`|Ψ⟩`)
+# Pixel Chemist (`|Ψ⟩`)
 
 **[Play in your browser](https://healdgar.github.io/pixel-chemist/)** · [GitHub repository](https://github.com/healdgar/pixel-chemist)
 
 A 2D omnidirectional cellular-automata physics & alchemy sidescroller built with TypeScript and HTML5 Canvas (`1120 × 720` active physics grid, `448 × 272` viewport).
 
-Dr. Aris Thorne must breach **6 high-security environments** using real-time chemical reactions, thermodynamics, nuclear decay, and quantum mechanics to rescue **Bibbi** from her Cryo-Stasis Vault—while outsmarting a live-learning **J.E.V. ("System-One") Neural Decision Engine**.
+Dr. Aris Thorne must breach **6 high-security environments** using real-time chemical reactions, thermodynamics, nuclear decay, and quantum mechanics to rescue **Debbi** from her Cryo-Stasis Vault—while outsmarting a live-learning **J.E.V. ("System-One") Neural Decision Engine**.
 
 ---
 

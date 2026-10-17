@@ -25,7 +25,7 @@ export class Player {
 
   public facing: 1 | -1 = 1;
   public grounded: boolean = false;
-  public carryingBibbi: boolean = false;
+  public carryingDebbi: boolean = false;
   public quantumPhaseTimer: number = 0; // >0 means player can walk through any solid wall!
   public fireCooldown: number = 0;
   public selectedTool: number = 1; // 1..9
@@ -45,7 +45,7 @@ export class Player {
       submerged: this.submerged, radiationDose: this.radiationDose, bodyTemp: this.bodyTemp,
       suitIntegrity: this.suitIntegrity,
       facing: this.facing, grounded: this.grounded,
-      carryingBibbi: this.carryingBibbi,
+      carryingDebbi: this.carryingDebbi,
       quantumPhaseTimer: this.quantumPhaseTimer, fireCooldown: this.fireCooldown,
       selectedTool: this.selectedTool, gravityScale: this.gravityScale,
     };
@@ -88,9 +88,9 @@ export class Player {
     const gpX = gp && gp.connected ? gp.moveX : 0;
     const gpY = gp && gp.connected ? gp.moveY : 0;
 
-    // Carrying Bibbi on your back adds mass: slightly lower sprint speed, heavier jetpack load, faster fuel burn
-    const accel = this.carryingBibbi ? 0.45 : 0.54;
-    const maxSpeed = this.carryingBibbi ? 2.68 : 3.2;
+    // Carrying Debbi on your back adds mass: slightly lower sprint speed, heavier jetpack load, faster fuel burn
+    const accel = this.carryingDebbi ? 0.45 : 0.54;
+    const maxSpeed = this.carryingDebbi ? 2.68 : 3.2;
 
     if (kbLeft || gpX < -0.1) {
       const intensity = kbLeft ? 1 : Math.min(1, Math.abs(gpX));
@@ -112,10 +112,10 @@ export class Player {
 
     if (moveUp) {
       const thrustScale = stickJetpackIntensity > 0 ? Math.max(0.55, stickJetpackIntensity) : 1.0;
-      const liftoffVy = this.carryingBibbi ? -2.85 : -3.4;
-      const maxClimbVy = this.carryingBibbi ? -2.35 : -3.3;
-      const jetThrust = this.carryingBibbi ? 0.35 : 0.48;
-      const fuelBurn = this.carryingBibbi ? 0.68 : 0.48;
+      const liftoffVy = this.carryingDebbi ? -2.85 : -3.4;
+      const maxClimbVy = this.carryingDebbi ? -2.35 : -3.3;
+      const jetThrust = this.carryingDebbi ? 0.35 : 0.48;
+      const fuelBurn = this.carryingDebbi ? 0.68 : 0.48;
 
       if (this.grounded) {
         // Immediate liftoff into jetpack flight when pushing Up on Left Thumbstick or pressing Jump!
@@ -138,7 +138,7 @@ export class Player {
     } else {
       this.jetpackFuel = Math.min(
         this.maxJetpack,
-        this.jetpackFuel + (this.grounded ? 1.8 : this.carryingBibbi ? 0.42 : 0.65)
+        this.jetpackFuel + (this.grounded ? 1.8 : this.carryingDebbi ? 0.42 : 0.65)
       );
       if (this.grounded && Math.abs(this.vx) > 0.7) {
         sound.playFootstep(false);
@@ -157,8 +157,8 @@ export class Player {
       }
     }
 
-    // Gravity (scaled by environment and increased by Bibbi's mass when piggybacking!)
-    const massMultiplier = this.carryingBibbi ? 1.28 : 1.0;
+    // Gravity (scaled by environment and increased by Debbi's mass when piggybacking!)
+    const massMultiplier = this.carryingDebbi ? 1.28 : 1.0;
     this.vy = Math.min(
       4.6 * this.gravityScale * massMultiplier,
       this.vy + 0.21 * this.gravityScale * massMultiplier

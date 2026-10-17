@@ -358,7 +358,7 @@ export const ELEMENTS: Record<ElementId, ElementDef> = {
     pressureInto: ElementId.QUANTUM_FOAM,
     weakDecayInto: ElementId.GLASS,
     radioactivity: 0,
-    description: 'Temporal containment crystal surrounding Bibbi. Dissolves when exposed to Temporal Chroniton Beams or Strong Force Unbinding.'
+    description: 'Temporal containment crystal surrounding Debbi. Dissolves when exposed to Temporal Chroniton Beams or Strong Force Unbinding.'
   },
 
   // POWDERS

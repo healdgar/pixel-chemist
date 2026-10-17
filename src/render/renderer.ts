@@ -14,8 +14,8 @@ import { LevelData } from '../world/levelGenerator';
 import {
   drawCompiledSprite,
   SPRITE_ALARM_BEACON,
-  SPRITE_BIBBI,
-  SPRITE_BIBBI_PIGGYBACK,
+  SPRITE_DEBBI,
+  SPRITE_DEBBI_PIGGYBACK,
   SPRITE_CEILING_SPRAYER,
   SPRITE_DRILLPOD,
   SPRITE_DRONE,
@@ -394,11 +394,11 @@ export class WorldRenderer {
     // 4b. Render J.E.V. Mobile Units (Hazmat Guards, Hunter-Seeker Drones, Heavy Combat Mechs)
     this.renderEnemyUnits(mainCtx, level, player, mouseWorld, baseCamX, baseCamY, scaleX, scaleY, tick);
 
-    // 5. Render Waiting Escape Vehicle & Bibbi
+    // 5. Render Waiting Escape Vehicle & Debbi
     this.renderEscapeVehicle(mainCtx, level, baseCamX, baseCamY, scaleX, scaleY, tick);
-    this.renderBibbi(mainCtx, level, baseCamX, baseCamY, scaleX, scaleY, tick);
+    this.renderDebbi(mainCtx, level, baseCamX, baseCamY, scaleX, scaleY, tick);
 
-    // 6. Render Dr. Vance (Player) in crisp pixel art (plus Bibbi piggybacking if carried!)
+    // 6. Render Dr. Vance (Player) in crisp pixel art (plus Debbi piggybacking if carried!)
     this.renderPlayer(mainCtx, player, level, mouseWorld, baseCamX, baseCamY, scaleX, scaleY, tick);
 
     // 7. Render Active Projectiles & Beams
@@ -422,8 +422,8 @@ export class WorldRenderer {
       thermalVision
     );
 
-    // 10. Render Subtle Edge Indicator toward Bibbi or Escape Vehicle
-    this.renderBibbiCompass(mainCtx, mainCanvas, player, level);
+    // 10. Render Subtle Edge Indicator toward Debbi or Escape Vehicle
+    this.renderDebbiCompass(mainCtx, mainCanvas, player, level);
   }
 
   private renderTerminals(
@@ -803,7 +803,7 @@ export class WorldRenderer {
     const py = (vy + hover) * sy;
     const ux = sx * 0.52;
     const uy = sy * 0.52;
-    const ready = level.bibbi.carried;
+    const ready = level.debbi.carried;
 
     ctx.save();
 
@@ -867,7 +867,7 @@ export class WorldRenderer {
     ctx.restore();
   }
 
-  private renderBibbi(
+  private renderDebbi(
     ctx: CanvasRenderingContext2D,
     level: LevelData,
     camX: number,
@@ -876,7 +876,7 @@ export class WorldRenderer {
     sy: number,
     tick: number
   ): void {
-    const b = level.bibbi;
+    const b = level.debbi;
     // When carried on Dr. Vance's back (and not yet extracted), renderPlayer draws her piggybacking
     if (b.carried && !b.rescued) return;
 
@@ -892,7 +892,7 @@ export class WorldRenderer {
     const px = vx * sx;
     const py = (vy - bounce) * sy;
 
-    // Aura glow around Bibbi
+    // Aura glow around Debbi
     const grad = ctx.createRadialGradient(px, py, 2, px, py, 9 * ex);
     grad.addColorStop(0, b.rescued ? 'rgba(255, 209, 102, 0.55)' : 'rgba(114, 239, 221, 0.4)');
     grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
@@ -901,10 +901,10 @@ export class WorldRenderer {
     ctx.arc(px, py, 9 * ex, 0, Math.PI * 2);
     ctx.fill();
 
-    // High-res 24x38 16-bit Pixel Art Bibbi
-    drawCompiledSprite(ctx, SPRITE_BIBBI, px, py - 0.5 * uy, ux, uy, {}, false);
+    // High-res 24x38 16-bit Pixel Art Debbi
+    drawCompiledSprite(ctx, SPRITE_DEBBI, px, py - 0.5 * uy, ux, uy, {}, false);
 
-    // Delicate HP bar if Bibbi has taken damage
+    // Delicate HP bar if Debbi has taken damage
     if (b.hp < b.maxHp && b.hp > 0) {
       const barW = 6 * ex;
       ctx.fillStyle = 'rgba(10, 14, 24, 0.88)';
@@ -913,12 +913,12 @@ export class WorldRenderer {
       ctx.fillRect(px - barW / 2, py - 5.6 * ey, barW * Math.max(0, b.hp / b.maxHp), 1.0 * ey);
     }
 
-    // Subtle compact tag above Bibbi
+    // Subtle compact tag above Debbi
     ctx.save();
     ctx.font = 'bold 10px "JetBrains Mono", monospace';
     ctx.textAlign = 'center';
     ctx.fillStyle = b.rescued ? '#ffd166' : '#ff99c8';
-    ctx.fillText(b.rescued ? '♥ EXTRACTED!' : '♥ BIBBI', px, py - 19);
+    ctx.fillText(b.rescued ? '♥ EXTRACTED!' : '♥ DEBBI', px, py - 19);
     ctx.restore();
   }
 
@@ -1013,14 +1013,14 @@ export class WorldRenderer {
       ctx.fillRect(px - sBarW / 2, sBarY, sBarW * Math.max(0, suitInt / 100), 0.8 * ey);
     }
 
-    // If Bibbi is riding piggyback on Dr. Vance's back (drawn over his backpack/shoulders!)
-    const b = level.bibbi;
+    // If Debbi is riding piggyback on Dr. Vance's back (drawn over his backpack/shoulders!)
+    const b = level.debbi;
     if (b.carried && !b.rescued) {
       const bx = px - f * 7.8 * ux;
       const by = py - 4.2 * uy + Math.sin(tick * 0.25) * 1.0 * uy;
       drawCompiledSprite(
         ctx,
-        SPRITE_BIBBI_PIGGYBACK,
+        SPRITE_DEBBI_PIGGYBACK,
         bx,
         by,
         ux * 0.82,
@@ -1029,7 +1029,7 @@ export class WorldRenderer {
         flip
       );
 
-      // Delicate Bibbi HP Bar & Piggyback Tag above Dr. Vance
+      // Delicate Debbi HP Bar & Piggyback Tag above Dr. Vance
       const barW = 7.0 * ex;
       ctx.fillStyle = 'rgba(10, 14, 24, 0.9)';
       ctx.fillRect(px - barW / 2, py - 7.6 * ey, barW, 1.1 * ey);
@@ -1039,7 +1039,7 @@ export class WorldRenderer {
       ctx.font = 'bold 9px "JetBrains Mono", monospace';
       ctx.textAlign = 'center';
       ctx.fillStyle = b.hp < 40 ? '#ff4d6d' : '#ff99c8';
-      ctx.fillText(`♥ BIBBI ${Math.ceil(b.hp)}%`, px, py - 8.1 * ey);
+      ctx.fillText(`♥ DEBBI ${Math.ceil(b.hp)}%`, px, py - 8.1 * ey);
     }
 
     // High-res 18x9 Omni-Tool Alchemy Blaster aiming toward mouse cursor
@@ -1167,13 +1167,13 @@ export class WorldRenderer {
     ctx.restore();
   }
 
-  private renderBibbiCompass(
+  private renderDebbiCompass(
     ctx: CanvasRenderingContext2D,
     canvas: HTMLCanvasElement,
     player: Player,
     level: LevelData
   ): void {
-    const b = level.bibbi;
+    const b = level.debbi;
     const targetX = b.carried ? level.escapeVehicle.x : b.x;
     const targetY = b.carried ? level.escapeVehicle.y : b.y;
     const dx = targetX - player.x;
@@ -1269,11 +1269,11 @@ export class WorldRenderer {
       tctx.fill();
     }
 
-    // Bibbi pulsing beacon on minimap
-    if (!level.bibbi.carried) {
+    // Debbi pulsing beacon on minimap
+    if (!level.debbi.carried) {
       tctx.fillStyle = '#f72585';
       tctx.beginPath();
-      tctx.arc(level.bibbi.x * sx, level.bibbi.y * sy, 4, 0, Math.PI * 2);
+      tctx.arc(level.debbi.x * sx, level.debbi.y * sy, 4, 0, Math.PI * 2);
       tctx.fill();
     }
 

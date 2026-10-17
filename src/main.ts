@@ -88,7 +88,7 @@ interface GameSnapshot {
   enemyUnits: NonNullable<LevelData['enemyUnits']>;
   defenses: NonNullable<LevelData['defenses']>;
   turrets: LevelData['turrets'];
-  bibbi: LevelData['bibbi'];
+  debbi: LevelData['debbi'];
   projectiles: Projectile[];
   camX: number;
   camY: number;
@@ -98,7 +98,7 @@ interface GameSnapshot {
 let tick = 0;
 let fusionAlertShown = false;
 let breachAlertShown = false;
-let bibbiDeathAlertShown = false;
+let debbiDeathAlertShown = false;
 
 // One-second checkpoints retain enough history for a roughly five-second rewind.
 const snapshots: GameSnapshot[] = [];
@@ -107,7 +107,7 @@ const SNAPSHOT_INTERVAL_TICKS = 60;
 const REWIND_TICKS = 300;
 
 function saveSnapshot(): void {
-  if (player.hp <= 0 || level.bibbi.hp <= 0) return;
+  if (player.hp <= 0 || level.debbi.hp <= 0) return;
   snapshots.push({
     tick,
     world: world.createSnapshot(player.x, player.y, player.hp),
@@ -116,7 +116,7 @@ function saveSnapshot(): void {
     enemyUnits: (level.enemyUnits ?? []).map((unit) => ({ ...unit })),
     defenses: (level.defenses ?? []).map((defense) => ({ ...defense })),
     turrets: level.turrets.map((turret) => ({ ...turret })),
-    bibbi: { ...level.bibbi },
+    debbi: { ...level.debbi },
     projectiles: projectiles.map((projectile) => ({ ...projectile })),
     camX: renderer.camX, camY: renderer.camY,
     fusionAlertShown,
@@ -142,15 +142,15 @@ function rewindTime(): void {
   level.enemyUnits = snap.enemyUnits.map((unit) => ({ ...unit }));
   level.defenses = snap.defenses.map((defense) => ({ ...defense }));
   level.turrets = snap.turrets.map((turret) => ({ ...turret }));
-  level.bibbi = { ...snap.bibbi };
-  player.carryingBibbi = level.bibbi.carried;
+  level.debbi = { ...snap.debbi };
+  player.carryingDebbi = level.debbi.carried;
   projectiles.splice(0, projectiles.length, ...snap.projectiles.map((projectile) => ({ ...projectile })));
   renderer.camX = snap.camX;
   renderer.camY = snap.camY;
   tick = snap.tick;
   fusionAlertShown = snap.fusionAlertShown;
   breachAlertShown = false;
-  bibbiDeathAlertShown = false;
+  debbiDeathAlertShown = false;
   document.querySelectorAll<HTMLDialogElement>('dialog[open]').forEach((dialog) => dialog.close());
   simulationClock.reset();
   selectTool(player.selectedTool, false);
@@ -171,7 +171,7 @@ function loadMap(mapId: MapId): void {
   world.fusionTriggered = false;
   fusionAlertShown = false;
   breachAlertShown = false;
-  bibbiDeathAlertShown = false;
+  debbiDeathAlertShown = false;
 
   level = generateLevel(world, mapId);
   jevDirector.resetForLevel(level.mapInfo.shortName);
@@ -574,8 +574,8 @@ function showEventModal(title: string, text: string): void {
   dlg.showModal();
 }
 
-// 5. Update Turrets & Bibbi Rescue State
-function updateTurretsAndBibbi(): void {
+// 5. Update Turrets & Debbi Rescue State
+function updateTurretsAndDebbi(): void {
   for (const t of level.turrets) {
     if (!t.active) continue;
     const gx = Math.floor(t.x);
@@ -625,22 +625,22 @@ function updateTurretsAndBibbi(): void {
     }
   }
 
-  // Check Bibbi's Stasis Cage, Delicate Health, Piggyback Pickup & Vehicle Extraction!
-  if (player.hp <= 0 || level.bibbi.hp <= 0) return;
+  // Check Debbi's Stasis Cage, Delicate Health, Piggyback Pickup & Vehicle Extraction!
+  if (player.hp <= 0 || level.debbi.hp <= 0) return;
 
-  player.carryingBibbi = level.bibbi.carried;
+  player.carryingDebbi = level.debbi.carried;
 
-  if (!level.bibbi.rescued) {
-    // When carried on Dr. Vance's back, keep Bibbi's world coordinates synced to his shoulders
-    if (level.bibbi.carried) {
-      level.bibbi.x = Math.round(player.x - player.facing * 4);
-      level.bibbi.y = Math.round(player.y - 3);
+  if (!level.debbi.rescued) {
+    // When carried on Dr. Vance's back, keep Debbi's world coordinates synced to his shoulders
+    if (level.debbi.carried) {
+      level.debbi.x = Math.round(player.x - player.facing * 4);
+      level.debbi.y = Math.round(player.y - 3);
     }
 
-    const bx = Math.floor(level.bibbi.x);
-    const by = Math.floor(level.bibbi.y);
+    const bx = Math.floor(level.debbi.x);
+    const by = Math.floor(level.debbi.y);
 
-    // Sample environmental hazards around delicate Bibbi (she does NOT have heavy hazmat shielding!)
+    // Sample environmental hazards around delicate Debbi (she does NOT have heavy hazmat shielding!)
     if (world.inBounds(bx, by)) {
       const bi = world.idx(bx, by);
       const bEl = world.grid[bi] as ElementId;
@@ -649,16 +649,16 @@ function updateTurretsAndBibbi(): void {
       const bRad = world.radiation[bi];
 
       if (bTemp > 110) {
-        level.bibbi.hp -= (bTemp - 110) * 0.008;
-        level.bibbi.hurtReason = 'extreme thermal burns';
-      } else if (bTemp < (level.bibbi.carried ? -65 : -110)) {
-        level.bibbi.hp -= Math.abs(bTemp + 65) * 0.005;
-        level.bibbi.hurtReason = 'cryogenic frostbite';
+        level.debbi.hp -= (bTemp - 110) * 0.008;
+        level.debbi.hurtReason = 'extreme thermal burns';
+      } else if (bTemp < (level.debbi.carried ? -65 : -110)) {
+        level.debbi.hp -= Math.abs(bTemp + 65) * 0.005;
+        level.debbi.hurtReason = 'cryogenic frostbite';
       }
 
       if (bEl === ElementId.ACID) {
-        level.bibbi.hp -= 1.15 * (world.getConcentration(bi) / 100);
-        level.bibbi.hurtReason = 'caustic / alchemical exposure';
+        level.debbi.hp -= 1.15 * (world.getConcentration(bi) / 100);
+        level.debbi.hurtReason = 'caustic / alchemical exposure';
       } else if (
         bEl === ElementId.TOXIC_GAS ||
         bEl === ElementId.PLASMA ||
@@ -667,33 +667,33 @@ function updateTurretsAndBibbi(): void {
         bEl === ElementId.LAVA ||
         bEl === ElementId.FIRE
       ) {
-        level.bibbi.hp -= 1.15;
-        level.bibbi.hurtReason = 'caustic / alchemical exposure';
+        level.debbi.hp -= 1.15;
+        level.debbi.hurtReason = 'caustic / alchemical exposure';
       }
 
       if (bPress > 35) {
-        level.bibbi.hp -= (bPress - 35) * 0.14;
-        level.bibbi.hurtReason = 'barotrauma blast wave';
+        level.debbi.hp -= (bPress - 35) * 0.14;
+        level.debbi.hurtReason = 'barotrauma blast wave';
       }
 
       if (bRad > 1.2) {
-        level.bibbi.hp -= (bRad - 1.2) * 0.25;
-        level.bibbi.hurtReason = 'acute radiation exposure';
+        level.debbi.hp -= (bRad - 1.2) * 0.25;
+        level.debbi.hurtReason = 'acute radiation exposure';
       }
 
-      if (level.bibbi.carried && player.oxygen <= 0) {
-        level.bibbi.hp -= 0.45;
-        level.bibbi.hurtReason = 'underwater hypoxia';
+      if (level.debbi.carried && player.oxygen <= 0) {
+        level.debbi.hp -= 0.45;
+        level.debbi.hurtReason = 'underwater hypoxia';
       }
 
       if (bEl === ElementId.BIO_GEL) {
-        level.bibbi.hp = Math.min(level.bibbi.maxHp, level.bibbi.hp + 0.55);
+        level.debbi.hp = Math.min(level.debbi.maxHp, level.debbi.hp + 0.55);
       }
 
-      level.bibbi.hp = Math.max(0, level.bibbi.hp);
+      level.debbi.hp = Math.max(0, level.debbi.hp);
     }
 
-    if (!level.bibbi.carried && level.bibbi.hp > 0) {
+    if (!level.debbi.carried && level.debbi.hp > 0) {
       let crystalCount = 0;
       for (let dy = -32; dy <= 32; dy += 2) {
         for (let dx = -32; dx <= 32; dx += 2) {
@@ -702,13 +702,13 @@ function updateTurretsAndBibbi(): void {
           }
         }
       }
-      level.bibbi.cageIntactCount = crystalCount;
+      level.debbi.cageIntactCount = crystalCount;
 
-      const distToBibbi = Math.hypot(player.x - bx, player.y - by);
-      // Check if there is a breached line-of-sight opening between Bibbi and Dr. Vance
+      const distToDebbi = Math.hypot(player.x - bx, player.y - by);
+      // Check if there is a breached line-of-sight opening between Debbi and Dr. Vance
       let crystalBlockingLine = false;
-      if (distToBibbi < 54 && distToBibbi > 1) {
-        const steps = Math.ceil(distToBibbi / 2);
+      if (distToDebbi < 54 && distToDebbi > 1) {
+        const steps = Math.ceil(distToDebbi / 2);
         for (let s = 1; s < steps; s++) {
           const rx = Math.round(bx + ((player.x - bx) * s) / steps);
           const ry = Math.round(by + ((player.y - by) * s) / steps);
@@ -721,9 +721,9 @@ function updateTurretsAndBibbi(): void {
 
       // Full pod ring has ~116 crystal sample points; breaching one side drops it below ~100 or opens a clear line of sight
       const cageBreached = !crystalBlockingLine || crystalCount < 100;
-      if (distToBibbi < 32 || (cageBreached && distToBibbi < 54)) {
-        level.bibbi.carried = true;
-        player.carryingBibbi = true;
+      if (distToDebbi < 32 || (cageBreached && distToDebbi < 54)) {
+        level.debbi.carried = true;
+        player.carryingDebbi = true;
         // Dissolve remaining Chroniton Stasis ring so the pod bursts open cleanly when she hops on your back
         for (let dy = -34; dy <= 34; dy++) {
           for (let dx = -34; dx <= 34; dx++) {
@@ -736,24 +736,24 @@ function updateTurretsAndBibbi(): void {
         gamepad.triggerRumble(180, 0.45, 0.7);
         jevDirector.reportIncident(
           35,
-          `ALERT: Intruder has Bibbi on his back! Intercept before he reaches the ${level.escapeVehicle.name}!`
+          `ALERT: Intruder has Debbi on his back! Intercept before he reaches the ${level.escapeVehicle.name}!`
         );
-        updateBibbiStatus();
+        updateDebbiStatus();
       }
-    } else if (level.bibbi.carried && level.bibbi.hp > 0) {
+    } else if (level.debbi.carried && level.debbi.hp > 0) {
       const ev = level.escapeVehicle;
       const distToEv = Math.hypot(player.x - ev.x, player.y - ev.y);
       if (distToEv < 38) {
-        level.bibbi.rescued = true;
-        player.carryingBibbi = false;
-        level.bibbi.x = ev.x;
-        level.bibbi.y = ev.y - 6;
+        level.debbi.rescued = true;
+        player.carryingDebbi = false;
+        level.debbi.x = ev.x;
+        level.debbi.y = ev.y - 6;
         sound.playVictory();
         gamepad.triggerRumble(320, 0.6, 0.85);
-        updateBibbiStatus();
+        updateDebbiStatus();
         showEventModal(
           `🎉 EXTRACTION COMPLETE: ESCAPED IN ${ev.name.toUpperCase()}!`,
-          `You carried Bibbi safely across the facility (${Math.ceil(level.bibbi.hp)}% health remaining) and boarded the waiting ${ev.name}! Click "Next World Map [N]" to infiltrate the next environment!`
+          `You carried Debbi safely across the facility (${Math.ceil(level.debbi.hp)}% health remaining) and boarded the waiting ${ev.name}! Click "Next World Map [N]" to infiltrate the next environment!`
         );
       }
     }
@@ -853,35 +853,35 @@ function renderJevTelemetryModal(): void {
   `;
 }
 
-function updateBibbiStatus(): void {
-  const bibbiPill = document.getElementById('bibbi-status-pill')!;
-  const b = level.bibbi;
+function updateDebbiStatus(): void {
+  const debbiPill = document.getElementById('debbi-status-pill')!;
+  const b = level.debbi;
   const hpPct = Math.max(0, Math.min(100, Math.ceil(b.hp)));
   if (b.rescued) {
-    bibbiPill.textContent = '♥ BIBBI EXTRACTED!';
-    bibbiPill.style.background = 'rgba(6, 214, 160, 0.25)';
-    bibbiPill.style.borderColor = '#06d6a0';
-    bibbiPill.style.color = '#06d6a0';
+    debbiPill.textContent = '♥ DEBBI EXTRACTED!';
+    debbiPill.style.background = 'rgba(6, 214, 160, 0.25)';
+    debbiPill.style.borderColor = '#06d6a0';
+    debbiPill.style.color = '#06d6a0';
   } else if (b.hp <= 0) {
-    bibbiPill.textContent = '💔 BIBBI LOST!';
-    bibbiPill.style.background = 'rgba(255, 0, 85, 0.28)';
-    bibbiPill.style.borderColor = '#ff0055';
-    bibbiPill.style.color = '#ff4d6d';
+    debbiPill.textContent = '💔 DEBBI LOST!';
+    debbiPill.style.background = 'rgba(255, 0, 85, 0.28)';
+    debbiPill.style.borderColor = '#ff0055';
+    debbiPill.style.color = '#ff4d6d';
   } else if (b.carried) {
-    bibbiPill.textContent = `🎒 ON BACK (${hpPct}%) → EXTRACT!`;
-    bibbiPill.style.background = hpPct < 45 ? 'rgba(255, 0, 85, 0.25)' : 'rgba(6, 214, 160, 0.22)';
-    bibbiPill.style.borderColor = hpPct < 45 ? '#ff0055' : '#06d6a0';
-    bibbiPill.style.color = hpPct < 45 ? '#ff4d6d' : '#06d6a0';
+    debbiPill.textContent = `🎒 ON BACK (${hpPct}%) → EXTRACT!`;
+    debbiPill.style.background = hpPct < 45 ? 'rgba(255, 0, 85, 0.25)' : 'rgba(6, 214, 160, 0.22)';
+    debbiPill.style.borderColor = hpPct < 45 ? '#ff0055' : '#06d6a0';
+    debbiPill.style.color = hpPct < 45 ? '#ff4d6d' : '#06d6a0';
   } else {
-    bibbiPill.textContent = hpPct < 100 ? `♥ BIBBI: ${hpPct}%` : 'BIBBI: IN STASIS';
-    bibbiPill.style.background = hpPct < 100 ? 'rgba(255, 0, 85, 0.22)' : 'rgba(247, 37, 133, 0.2)';
-    bibbiPill.style.borderColor = hpPct < 100 ? '#ff0055' : 'rgba(247, 37, 133, 0.5)';
-    bibbiPill.style.color = hpPct < 100 ? '#ff4d6d' : '#ff99c8';
+    debbiPill.textContent = hpPct < 100 ? `♥ DEBBI: ${hpPct}%` : 'DEBBI: IN STASIS';
+    debbiPill.style.background = hpPct < 100 ? 'rgba(255, 0, 85, 0.22)' : 'rgba(247, 37, 133, 0.2)';
+    debbiPill.style.borderColor = hpPct < 100 ? '#ff0055' : 'rgba(247, 37, 133, 0.5)';
+    debbiPill.style.color = hpPct < 100 ? '#ff4d6d' : '#ff99c8';
   }
 }
 
 function updateHud(): void {
-  updateBibbiStatus();
+  updateDebbiStatus();
   const hpPct = Math.max(0, Math.min(100, Math.round(player.hp)));
   hpBar.style.width = `${hpPct}%`;
   hpText.textContent = `${hpPct}`;
@@ -945,14 +945,14 @@ function updateHud(): void {
     );
   }
 
-  // Trigger Bibbi Lost Modal if delicate Bibbi's HP hits 0!
-  if (level.bibbi.hp <= 0 && !bibbiDeathAlertShown) {
-    bibbiDeathAlertShown = true;
+  // Trigger Debbi Lost Modal if delicate Debbi's HP hits 0!
+  if (level.debbi.hp <= 0 && !debbiDeathAlertShown) {
+    debbiDeathAlertShown = true;
     gamepad.triggerRumble(550, 0.9, 1.0);
-    const cause = level.bibbi.hurtReason || 'alchemical crossfire';
+    const cause = level.debbi.hurtReason || 'alchemical crossfire';
     showEventModal(
-      '💔 BIBBI PERISHED!',
-      `Bibbi is delicate and succumbed to ${cause}! Watch your fire and shield her from blasts and hazards while escorting her to the ${level.escapeVehicle.name}. Press [Y / R] to activate your Chroniton Time-Rewind device and rewind 5 seconds!`
+      '💔 DEBBI PERISHED!',
+      `Debbi is delicate and succumbed to ${cause}! Watch your fire and shield her from blasts and hazards while escorting her to the ${level.escapeVehicle.name}. Press [Y / R] to activate your Chroniton Time-Rewind device and rewind 5 seconds!`
     );
   }
 
@@ -976,7 +976,7 @@ function isSimulationPaused(): boolean {
   return (
     manualPause ||
     player.hp <= 0 ||
-    level.bibbi.hp <= 0 ||
+    level.debbi.hp <= 0 ||
     document.hidden ||
     document.querySelector('dialog[open]') !== null
   );
@@ -1110,13 +1110,13 @@ function simulateTick(gp: GamepadState): void {
     level.enemyUnits || [],
     level.defenses || [],
     projectiles,
-    level.bibbi,
+    level.debbi,
     sound,
     tick
   );
 
-  updateProjectiles(projectiles, world, sound, player, level.enemyUnits, level.bibbi);
-  updateTurretsAndBibbi();
+  updateProjectiles(projectiles, world, sound, player, level.enemyUnits, level.debbi);
+  updateTurretsAndDebbi();
 
   // Step atomic pixel simulation around camera
   renderer.updateCamera(player, world);
@@ -1130,7 +1130,7 @@ function simulateTick(gp: GamepadState): void {
   if (
     tick % 4 === 0 ||
     player.hp <= 0 ||
-    level.bibbi.hp <= 0 ||
+    level.debbi.hp <= 0 ||
     (world.fusionTriggered && !fusionAlertShown)
   ) {
     renderer.renderMinimap(minimapCanvas, world, player, level);

@@ -3,7 +3,7 @@ import { WorldGrid } from '../simulation/world';
 import { SoundEngine } from '../audio/soundEngine';
 import type { Player } from './player';
 import type { EnemyUnit } from '../ai/jevDirector';
-import type { BibbiState } from '../world/levelGenerator';
+import type { DebbiState } from '../world/levelGenerator';
 
 export interface ToolDef {
   id: number;
@@ -149,7 +149,7 @@ export function updateProjectiles(
   sound: SoundEngine,
   player?: Player,
   enemyUnits?: EnemyUnit[],
-  bibbi?: BibbiState
+  debbi?: DebbiState
 ): void {
   for (let i = projectiles.length - 1; i >= 0; i--) {
     const p = projectiles[i];
@@ -187,7 +187,7 @@ export function updateProjectiles(
             Math.abs(p.y - u.y) <= u.height * 0.82 + shockMargin
           ) {
             handleDirectEnemyHit(p, u, gx, gy, world, sound);
-            this_handleProjectileImpact(p, gx, gy, world, sound, bibbi, player);
+            this_handleProjectileImpact(p, gx, gy, world, sound, debbi, player);
             hit = true;
             break;
           }
@@ -195,9 +195,9 @@ export function updateProjectiles(
         if (hit) break;
       }
 
-      // 1b. Check direct impact on Bibbi when she is uncarried (delicate: player's own weapons can harm her!)
-      if (bibbi && !bibbi.carried && !bibbi.rescued && bibbi.hp > 0) {
-        if (Math.abs(p.x - bibbi.x) <= 6.5 && Math.abs(p.y - bibbi.y) <= 8.5) {
+      // 1b. Check direct impact on Debbi when she is uncarried (delicate: player's own weapons can harm her!)
+      if (debbi && !debbi.carried && !debbi.rescued && debbi.hp > 0) {
+        if (Math.abs(p.x - debbi.x) <= 6.5 && Math.abs(p.y - debbi.y) <= 8.5) {
           const isSafeBeam =
             p.type === 'time_accel' ||
             p.type === 'time_stasis' ||
@@ -216,13 +216,13 @@ export function updateProjectiles(
                 : p.type === 'heat'
                 ? 6
                 : 16;
-            bibbi.hp = Math.max(0, bibbi.hp - dmg);
-            bibbi.inDanger = true;
-            bibbi.hurtReason = p.fromPlayer
+            debbi.hp = Math.max(0, debbi.hp - dmg);
+            debbi.inDanger = true;
+            debbi.hurtReason = p.fromPlayer
               ? 'Struck directly by your own weapon!'
               : 'Hit by J.E.V. crossfire!';
             sound.playCombatHit(true, false);
-            this_handleProjectileImpact(p, gx, gy, world, sound, bibbi, player);
+            this_handleProjectileImpact(p, gx, gy, world, sound, debbi, player);
             hit = true;
             break;
           }
@@ -252,14 +252,14 @@ export function updateProjectiles(
             player.hp = Math.max(0, player.hp - 5.5 * dmgMult);
             player.bodyTemp = Math.min(120, player.bodyTemp + (6 + skinExp * 14));
           }
-          // If Bibbi is riding on the player's back, enemy hits also hurt delicate Bibbi!
-          if (bibbi && bibbi.carried && !bibbi.rescued && bibbi.hp > 0) {
-            bibbi.hp = Math.max(0, bibbi.hp - 9.5);
-            bibbi.inDanger = true;
-            bibbi.hurtReason = 'Hit by enemy fire while riding on your back!';
+          // If Debbi is riding on the player's back, enemy hits also hurt delicate Debbi!
+          if (debbi && debbi.carried && !debbi.rescued && debbi.hp > 0) {
+            debbi.hp = Math.max(0, debbi.hp - 9.5);
+            debbi.inDanger = true;
+            debbi.hurtReason = 'Hit by enemy fire while riding on your back!';
           }
           sound.playCombatHit(true, false);
-          this_handleProjectileImpact(p, gx, gy, world, sound, bibbi, player);
+          this_handleProjectileImpact(p, gx, gy, world, sound, debbi, player);
           hit = true;
           break;
         }
@@ -343,7 +343,7 @@ export function updateProjectiles(
           p.ttl < 78;
 
         if (speed < 0.75 || p.ttl <= 2 || sodiumWaterReaction) {
-          this_handleProjectileImpact(p, gx, gy, world, sound, bibbi, player);
+          this_handleProjectileImpact(p, gx, gy, world, sound, debbi, player);
           hit = true;
           break;
         }
@@ -352,7 +352,7 @@ export function updateProjectiles(
 
       // Solids and powders stop projectiles and trigger full alchemical impact
       if (state === 'solid' || state === 'powder') {
-        this_handleProjectileImpact(p, gx, gy, world, sound, bibbi, player);
+        this_handleProjectileImpact(p, gx, gy, world, sound, debbi, player);
         hit = true;
         break;
       }
@@ -467,33 +467,33 @@ function this_handleProjectileImpact(
   gy: number,
   world: WorldGrid,
   sound: SoundEngine,
-  bibbi?: BibbiState,
+  debbi?: DebbiState,
   player?: Player
 ): void {
-  // Check if an explosive/thermal blast impacts dangerously close to delicate Bibbi!
-  if (bibbi && !bibbi.rescued && bibbi.hp > 0) {
-    const distToBibbi = Math.hypot(gx - bibbi.x, gy - bibbi.y);
-    if (distToBibbi < 9.5) {
+  // Check if an explosive/thermal blast impacts dangerously close to delicate Debbi!
+  if (debbi && !debbi.rescued && debbi.hp > 0) {
+    const distToDebbi = Math.hypot(gx - debbi.x, gy - debbi.y);
+    if (distToDebbi < 9.5) {
       if (p.type === 'implosion') {
-        bibbi.hp = Math.max(0, bibbi.hp - 42);
-        bibbi.inDanger = true;
-        bibbi.hurtReason = 'Crushed by your Hyper-Implosion blast!';
+        debbi.hp = Math.max(0, debbi.hp - 42);
+        debbi.inDanger = true;
+        debbi.hurtReason = 'Crushed by your Hyper-Implosion blast!';
       } else if (p.type === 'kinetic') {
-        bibbi.hp = Math.max(0, bibbi.hp - 18);
-        bibbi.inDanger = true;
-        bibbi.hurtReason = 'Blasted by your Pressure Cannon shockwave!';
+        debbi.hp = Math.max(0, debbi.hp - 18);
+        debbi.inDanger = true;
+        debbi.hurtReason = 'Blasted by your Pressure Cannon shockwave!';
       } else if (p.type === 'heat') {
-        bibbi.hp = Math.max(0, bibbi.hp - 4.5);
-        bibbi.inDanger = true;
-        bibbi.hurtReason = 'Scorched by your Flamethrower!';
+        debbi.hp = Math.max(0, debbi.hp - 4.5);
+        debbi.inDanger = true;
+        debbi.hurtReason = 'Scorched by your Flamethrower!';
       } else if (p.type === 'cryo') {
-        bibbi.hp = Math.max(0, bibbi.hp - 10);
-        bibbi.inDanger = true;
-        bibbi.hurtReason = 'Frozen by your Cryo-Jet!';
+        debbi.hp = Math.max(0, debbi.hp - 10);
+        debbi.inDanger = true;
+        debbi.hurtReason = 'Frozen by your Cryo-Jet!';
       } else if (p.type === 'strong_unbind') {
-        bibbi.hp = Math.max(0, bibbi.hp - 28);
-        bibbi.inDanger = true;
-        bibbi.hurtReason = 'Exposed to your Gluon Unbinder!';
+        debbi.hp = Math.max(0, debbi.hp - 28);
+        debbi.inDanger = true;
+        debbi.hurtReason = 'Exposed to your Gluon Unbinder!';
       }
     }
   }

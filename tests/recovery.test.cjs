@@ -6,7 +6,7 @@ function restoredState(game) {
   return JSON.parse(game.run(`JSON.stringify({
     player: player.createSnapshot(), director: jevDirector.createSnapshot(),
     units: level.enemyUnits, turrets: level.turrets, defenses: level.defenses,
-    bibbi: level.bibbi, projectiles, tick, camX: renderer.camX, camY: renderer.camY,
+    debbi: level.debbi, projectiles, tick, camX: renderer.camX, camY: renderer.camY,
     cell: [world.grid[500], world.bgGrid[500], world.temp[500], world.pressure[500],
       world.radiation[500], world.flags[500], world.life[500], world.colorNoise[500]],
     worldTick: world.tickCount, rng: world.rngState, parity: world.parity,
@@ -36,7 +36,7 @@ test('rewind restores player, entities, projectiles, world fields, tactical stat
   game.run(`
     player.hp = 0; player.oxygen = 0; player.jetpackFuel = 0; player.radiationDose = 90;
     level.enemyUnits[0].active = false; level.enemyUnits[0].hp = 0;
-    level.turrets[0].active = false; level.defenses[0].hp = 0; level.bibbi.rescued = true;
+    level.turrets[0].active = false; level.defenses[0].hp = 0; level.debbi.rescued = true;
     projectiles[0].ttl = 1; world.grid[500] = 0; world.bgGrid[500] = 0; world.temp[500] = 22;
     world.pressure[500] = 0; world.radiation[500] = 0; world.flags[500] = 0;
     world.life[500] = 0; world.colorNoise[500] = 0; world.tickCount = 999;
@@ -48,7 +48,7 @@ test('rewind restores player, entities, projectiles, world fields, tactical stat
     rewindTime();
   `);
   assert.deepEqual(restoredState(game), expected);
-  assert.equal(game.element('bibbi-status-pill').textContent, 'BIBBI: IN STASIS');
+  assert.equal(game.element('debbi-status-pill').textContent, 'DEBBI: IN STASIS');
   // Continuing the restored game must not mutate the retained checkpoint.
   game.run(`level.enemyUnits[0].hp = 1; projectiles[0].ttl = 2; jevDirector.brain.w1.fill(1); rewindTime();`);
   assert.deepEqual(restoredState(game), expected);
@@ -93,15 +93,15 @@ test('closing a breach dialog cannot resume movement, shooting, phasing, or resc
   game.arena();
   game.frame(0);
   game.run(`player.hp = 0; updateHud(); keys.add('KeyD'); mouseLeftDown = true;
-    level.bibbi.x = player.x; level.bibbi.y = player.y;`);
+    level.debbi.x = player.x; level.debbi.y = player.y;`);
   game.key('Escape');
   game.frame(1000);
-  game.run('player.update(keys, world, sound); player.fireTool(400, 100, false, projectiles, world, sound); player.activateQuantumDash(sound); updateTurretsAndBibbi();');
+  game.run('player.update(keys, world, sound); player.fireTool(400, 100, false, projectiles, world, sound); player.activateQuantumDash(sound); updateTurretsAndDebbi();');
   assert.equal(game.run('player.x'), 100);
   assert.equal(game.run('tick'), 0);
   assert.equal(game.run('projectiles.length'), 0);
   assert.equal(game.run('player.quantumPhaseTimer'), 0);
-  assert.equal(game.run('level.bibbi.rescued'), false);
+  assert.equal(game.run('level.debbi.rescued'), false);
 });
 
 test('map restart resets the entire player state while retaining the selected tool', () => {
@@ -150,26 +150,26 @@ test('curriculum covers all six directives, including neutral pressure-tool inte
   assert.ok(result.neutralIntercepts > 0);
 });
 
-test('touching Bibbi puts her on the player back first and only reaching the escape vehicle wins', () => {
+test('touching Debbi puts her on the player back first and only reaching the escape vehicle wins', () => {
   const game = createGame();
   game.arena();
   game.run(`
-    level.bibbi.x = 300; level.bibbi.y = 300; level.bibbi.carried = false; level.bibbi.rescued = false;
+    level.debbi.x = 300; level.debbi.y = 300; level.debbi.carried = false; level.debbi.rescued = false;
     level.escapeVehicle = { x: 100, y: 100, name: 'Cryo-VTOL Dropship', type: 'dropship' };
     player.x = 290; player.y = 300;
-    updateTurretsAndBibbi();
+    updateTurretsAndDebbi();
   `);
-  assert.equal(game.run('level.bibbi.carried'), true);
-  assert.equal(game.run('player.carryingBibbi'), true);
-  assert.equal(game.run('level.bibbi.rescued'), false);
+  assert.equal(game.run('level.debbi.carried'), true);
+  assert.equal(game.run('player.carryingDebbi'), true);
+  assert.equal(game.run('level.debbi.rescued'), false);
   assert.equal(game.element('event-dialog').open, false);
 
   game.run(`
     player.x = 105; player.y = 100;
-    updateTurretsAndBibbi();
+    updateTurretsAndDebbi();
   `);
-  assert.equal(game.run('level.bibbi.rescued'), true);
-  assert.equal(game.run('player.carryingBibbi'), false);
+  assert.equal(game.run('level.debbi.rescued'), true);
+  assert.equal(game.run('player.carryingDebbi'), false);
   assert.equal(game.element('event-dialog').open, true);
 });
 
@@ -352,7 +352,7 @@ test('flamethrower standoff allows running forward while firing without burning 
     for (let t = 0; t < 60; t++) {
       player.update(keys, world, sound);
       player.fireTool(player.x + 80, player.y, false, projectiles, world, sound);
-      updateProjectiles(projectiles, world, sound, player, level.enemyUnits, level.bibbi);
+      updateProjectiles(projectiles, world, sound, player, level.enemyUnits, level.debbi);
       world.step(player.x, player.y, sound);
     }
     keys.delete("KeyD");
@@ -522,8 +522,8 @@ test('hazmat suit eventually burns through to expose skin to freezing/burning, a
     player.fireCooldown = 0;
     player.fireTool(160, 195, true, projectiles, world, sound); // Secondary implosion shot
     for (let t = 0; t < 15; t++) {
-      updateProjectiles(projectiles, world, sound, player, level.enemyUnits, level.bibbi);
-      jevDirector.update(world, player, level.enemyUnits, level.defenses, projectiles, level.bibbi, sound, t);
+      updateProjectiles(projectiles, world, sound, player, level.enemyUnits, level.debbi);
+      jevDirector.update(world, player, level.enemyUnits, level.defenses, projectiles, level.debbi, sound, t);
     }
 
     let physicalDebrisPixels = 0;

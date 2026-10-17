@@ -120,7 +120,7 @@ function createGame() {
         world.pressure.fill(0); world.radiation.fill(0); world.flags.fill(0); world.life.fill(0);
         world.fusionTriggered = false;
         level.turrets = []; level.enemyUnits = []; level.defenses = []; level.sectors = [];
-        level.bibbi.x = 900; level.bibbi.y = 600; level.bibbi.rescued = false;
+        level.debbi.x = 900; level.debbi.y = 600; level.debbi.rescued = false;
         player.x = 100; player.y = 100; player.vx = 0; player.vy = 0; player.hp = 100;
         renderer.camX = 0; renderer.camY = 0;
         projectiles.length = 0; snapshots.length = 0; saveSnapshot();
