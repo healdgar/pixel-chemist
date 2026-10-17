@@ -20,10 +20,8 @@ import {
   SPRITE_DRILLPOD,
   SPRITE_DRONE,
   SPRITE_GUARD_BODY,
-  SPRITE_GUARD_RIFLE,
   SPRITE_LASER_EMITTER,
   SPRITE_MECH_BODY,
-  SPRITE_MECH_CANNON,
   SPRITE_OMNI_TOOL,
   SPRITE_PLAYER_BODY,
   SPRITE_SUBMERSIBLE,
@@ -438,18 +436,11 @@ export class WorldRenderer {
     sy: number,
     tick: number
   ): void {
-    const ux = sx * 0.72;
-    const uy = sy * 0.72;
+    const ux = sx * 0.44;
+    const uy = sy * 0.44;
     const screenColor = tick % 40 < 28 ? '#00f5d4' : '#4cc9f0';
     const termPalette: Record<string, string> = {
-      O: '#141824',
-      S: '#495057',
-      g: '#2b2d42',
-      C: '#0096c7',
-      R: '#ff595e',
-      G: '#80ed99',
-      Y: '#ffd166',
-      K: '#adb5bd',
+      C: screenColor,
     };
 
     for (const term of level.terminals) {
@@ -463,11 +454,9 @@ export class WorldRenderer {
       drawCompiledSprite(ctx, SPRITE_TERMINAL, px, py - 1 * sy, ux, uy, termPalette, false);
 
       // Animated CRT data scanlines inside screen
-      ctx.fillStyle = screenColor;
-      const scanY = (tick >> 2) % 4;
-      ctx.fillRect(px - 3.2 * ux, py - (7.2 - scanY) * uy, 5.8 * ux, 0.85 * uy);
       ctx.fillStyle = '#a8f9ff';
-      ctx.fillRect(px - 3.2 * ux, py - 7.5 * uy, 3.4 * ux, 0.75 * uy);
+      const scanY = (tick >> 2) % 7;
+      ctx.fillRect(px - 6.0 * ux, py - (15.5 - scanY) * uy, 11.0 * ux, 1.1 * uy);
 
       const dist = Math.hypot(player.x - term.x, player.y - term.y);
       if (dist < 32) {
@@ -495,8 +484,8 @@ export class WorldRenderer {
     sy: number,
     tick: number
   ): void {
-    const ux = sx * 0.78;
-    const uy = sy * 0.78;
+    const ux = sx * 0.44;
+    const uy = sy * 0.44;
     const ex = sx * 2;
     const ey = sy * 2;
 
@@ -512,21 +501,15 @@ export class WorldRenderer {
         t.type === 'kinetic' ? '#ffd166' : t.type === 'thermal' ? '#ff595e' : '#70e000';
 
       const turretPalette: Record<string, string> = {
-        O: '#11151c',
-        S: '#495057',
-        s: '#6c757d',
-        g: '#2b2d42',
-        G: '#343a40',
-        M: (tick & 7) < 4 ? coreColor : '#adb5bd',
-        L: coreColor,
+        L: (tick & 7) < 5 ? coreColor : '#ffffff',
       };
 
       drawCompiledSprite(ctx, SPRITE_TURRET, px, py, ux, uy, turretPalette, false);
 
       // Subtle laser rangefinder glint on top pod
       if ((tick & 15) < 10) {
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(px + 0.5 * ux, py - 5.8 * uy, 1.1 * ux, 1.1 * uy);
+        ctx.fillStyle = coreColor;
+        ctx.fillRect(px + 1.0 * ux, py - 13.5 * uy, 2.2 * ux, 2.0 * uy);
       }
 
       // HP bar if damaged
@@ -549,8 +532,8 @@ export class WorldRenderer {
     tick: number
   ): void {
     if (!level.defenses) return;
-    const ux = sx * 0.78;
-    const uy = sy * 0.78;
+    const ux = sx * 0.44;
+    const uy = sy * 0.44;
     const ex = sx * 2;
 
     for (const d of level.defenses) {
@@ -566,7 +549,7 @@ export class WorldRenderer {
         const endPx = (d.currentEndX - camX) * sx;
         const endPy = (d.currentEndY - camY) * sy;
 
-        // Beveled 16-bit Wall Laser Emitter Housing
+        // High-res 16-bit Wall Laser Emitter Housing
         drawCompiledSprite(
           ctx,
           SPRITE_LASER_EMITTER,
@@ -575,12 +558,7 @@ export class WorldRenderer {
           ux,
           uy,
           {
-            O: '#11151c',
-            S: '#6c757d',
-            s: '#343a40',
-            g: '#2b2d42',
             L: d.triggered ? '#ff0055' : '#e63946',
-            W: '#ffccd5',
           },
           false
         );
@@ -620,17 +598,10 @@ export class WorldRenderer {
           ctx,
           SPRITE_CEILING_SPRAYER,
           px,
-          py + 1.5 * uy,
+          py + 3.0 * uy,
           ux,
           uy,
-          {
-            O: '#11151c',
-            S: '#6c757d',
-            g: '#343a40',
-            Y: d.triggered ? '#80ed99' : '#ffd166',
-            W: '#f8f9fa',
-            C: d.triggered ? '#80ed99' : '#4cc9f0',
-          },
+          {},
           false
         );
       } else if (d.type === 'alarm_beacon') {
@@ -643,12 +614,8 @@ export class WorldRenderer {
           ux,
           uy,
           {
-            O: '#11151c',
-            R: d.triggered ? (pulse ? '#ff0055' : '#ff595e') : '#d90429',
-            Y: '#ffd166',
+            R: d.triggered ? (pulse ? '#ff0055' : '#ff595e') : '#ff7b00',
             W: d.triggered && pulse ? '#ffffff' : '#ffbe0b',
-            S: '#adb5bd',
-            g: '#495057',
           },
           false
         );
@@ -659,7 +626,7 @@ export class WorldRenderer {
           ctx.lineWidth = 1.5;
           const r = ((tick % 30) / 30) * 18 * ex;
           ctx.beginPath();
-          ctx.arc(px, py - 2 * uy, r, 0, Math.PI * 2);
+          ctx.arc(px, py - 4 * uy, r, 0, Math.PI * 2);
           ctx.stroke();
           ctx.restore();
         }
@@ -717,8 +684,9 @@ export class WorldRenderer {
       }
 
       if (u.type === 'guard') {
-        const ux = sx * 0.78;
-        const uy = sy * 0.78;
+        // High-res 34x40 J.E.V. Hazmat Guard with animated pixel-art leg stride
+        const ux = sx * 0.44;
+        const uy = sy * 0.44;
         const loadoutColor =
           u.weaponLoadout === 'cryo'
             ? '#72efdd'
@@ -726,58 +694,29 @@ export class WorldRenderer {
             ? '#80ed99'
             : '#ff595e';
         const rusted = u.rustedLevel > 25;
-
-        // Animated Guard Boots & Knee Pads
-        const swing = Math.abs(u.vx) > 0.1 ? Math.sin(tick * 0.32) * 1.6 : 0;
-        ctx.fillStyle = '#11151c';
-        ctx.fillRect(px - 3.6 * ux, py + (5.8 + swing * 0.4) * uy, 3.0 * ux, 4.2 * uy);
-        ctx.fillRect(px + 0.8 * ux, py + (5.8 - swing * 0.4) * uy, 3.0 * ux, 4.2 * uy);
-        ctx.fillStyle = '#2b2d42';
-        ctx.fillRect(px - 3.0 * ux, py + (6.2 + swing * 0.4) * uy, 1.8 * ux, 3.2 * uy);
-        ctx.fillRect(px + 1.4 * ux, py + (6.2 - swing * 0.4) * uy, 1.8 * ux, 3.2 * uy);
+        const swing = Math.abs(u.vx) > 0.1 ? Math.sin(tick * 0.32) * 1.8 : 0;
 
         drawCompiledSprite(
           ctx,
           SPRITE_GUARD_BODY,
-          px,
-          py - 0.8 * uy,
+          px + f * 1.2 * ux,
+          py + 0.5 * uy,
           ux,
           uy,
           {
-            O: '#11151c',
-            H: '#2b2d42',
             R: rusted ? '#b55335' : '#d90429',
             r: rusted ? '#7f3924' : '#9b001a',
-            o: '#1b1f2a',
-            g: '#6c757d',
-            Y: '#ffd166',
             V: loadoutColor,
-            M: '#495057',
-            D: '#212529',
           },
-          flip
-        );
-
-        // Counter-Alchemy Assault Rifle
-        drawCompiledSprite(
-          ctx,
-          SPRITE_GUARD_RIFLE,
-          px + f * 3.8 * ux,
-          py + 0.8 * uy,
-          ux * 0.85,
-          uy * 0.85,
-          {
-            O: '#11151c',
-            G: '#adb5bd',
-            L: loadoutColor,
-          },
-          flip
+          flip,
+          { waistY: 26, splitX: 14, swingY: swing * 0.65, swingX: swing * 0.45 }
         );
       } else if (u.type === 'drone') {
-        const ux = sx * 0.76;
-        const uy = sy * 0.76;
+        // High-res 44x22 Hunter-Seeker Drone
+        const ux = sx * 0.40;
+        const uy = sy * 0.40;
         const eyeColor = u.weaponLoadout === 'sodium_bomb' ? '#ff9f1c' : '#f72585';
-        const rotorPhase = (tick & 1) === 0 ? '#00f5d4' : '#4cc9f0';
+        const rotorPhase = (tick & 1) === 0 ? '#00f5d4' : '#72efdd';
 
         drawCompiledSprite(
           ctx,
@@ -787,88 +726,40 @@ export class WorldRenderer {
           ux,
           uy,
           {
-            O: '#11151c',
             C: rotorPhase,
-            g: '#495057',
-            S: '#2b2d42',
             M: eyeColor,
-            W: '#ffffff',
-            Y: '#ff9f1c',
-            y: '#e07a5f',
           },
           flip
         );
 
         // Shimmering plasma rotor rings
         ctx.fillStyle = '#a8f9ff';
-        const rPulse = (tick & 1) === 0 ? 7.5 : 5.0;
-        ctx.fillRect(px - rPulse * ux, py - 6.8 * uy, 2.2 * ux, 0.9 * uy);
-        ctx.fillRect(px + (rPulse - 2.2) * ux, py - 6.8 * uy, 2.2 * ux, 0.9 * uy);
+        const rPulse = (tick & 1) === 0 ? 15.0 : 10.0;
+        ctx.fillRect(px - rPulse * ux, py - 9.5 * uy, 4.5 * ux, 1.4 * uy);
+        ctx.fillRect(px + (rPulse - 4.5) * ux, py - 9.5 * uy, 4.5 * ux, 1.4 * uy);
       } else if (u.type === 'robot') {
-        // HEAVY AEGIS COMBAT MECH / WALKER SPRITE (24x22 Upper + Articulated Hydraulic Legs)
-        const ux = sx * 0.82;
-        const uy = sy * 0.82;
+        // High-res 54x48 Heavy Aegis Combat Mech with animated reverse-joint hydraulic leg stride
+        const ux = sx * 0.48;
+        const uy = sy * 0.48;
         const rustTint = u.rustedLevel > 20;
-
-        // Articulated Reverse-Joint Walker Legs with Copper Hydraulic Pistons
         const stomp = Math.abs(u.vx) > 0.1 ? Math.sin(tick * 0.22) * 2.2 : 0;
-        const legL = py + (3.2 + stomp * 0.45) * uy;
-        const legR = py + (3.2 - stomp * 0.45) * uy;
 
-        // Left & Right Leg Outlines + Armor Greaves + Pistons + Claws
-        for (let side = -1; side <= 1; side += 2) {
-          const lx = px + side * 4.4 * ux;
-          const ly = side < 0 ? legL : legR;
-          ctx.fillStyle = '#11151c';
-          ctx.fillRect(lx - 2.6 * ux, ly, 5.2 * ux, 8.2 * uy);
-          ctx.fillRect(lx - 3.6 * ux, ly + 6.4 * uy, 7.2 * ux, 2.2 * uy);
-          ctx.fillStyle = rustTint ? '#7f3924' : '#495057';
-          ctx.fillRect(lx - 1.8 * ux, ly + 0.6 * uy, 3.6 * ux, 6.8 * uy);
-          // Hydraulic copper piston rod
-          ctx.fillStyle = '#f4a261';
-          ctx.fillRect(lx - 0.5 * ux, ly + 1.2 * uy, 1.1 * ux, 3.2 * uy);
-          // Armored footpad
-          ctx.fillStyle = rustTint ? '#9e472a' : '#6c757d';
-          ctx.fillRect(lx - 2.8 * ux, ly + 6.8 * uy, 5.6 * ux, 1.2 * uy);
-        }
-
-        // Upper Torso, Beveled Pauldrons & Cyclops Visor
         drawCompiledSprite(
           ctx,
           SPRITE_MECH_BODY,
           px,
-          py - 3.5 * uy,
+          py - 1.5 * uy,
           ux,
           uy,
-          {
-            O: '#11151c',
-            P: rustTint ? '#b55335' : '#8d99ae',
-            p: rustTint ? '#8c3f27' : '#6c757d',
-            H: rustTint ? '#7f3924' : '#495057',
-            h: rustTint ? '#5e2a1b' : '#343a40',
-            g: '#2b2d42',
-            R: '#ff0055',
-            W: '#ffccd5',
-            c: '#ff9f1c',
-          },
-          flip
-        );
-
-        // Heavy Yellow-Gold Graviton Arm Cannon
-        drawCompiledSprite(
-          ctx,
-          SPRITE_MECH_CANNON,
-          px + f * 8.5 * ux,
-          py - 1.8 * uy,
-          ux * 0.95,
-          uy * 0.95,
-          {
-            O: '#11151c',
-            Y: '#ffd166',
-            y: '#f4a261',
-            C: '#00f5d4',
-          },
-          !flip
+          rustTint
+            ? {
+                P: '#b55335',
+                p: '#8c3f27',
+                H: '#6f321f',
+              }
+            : {},
+          flip,
+          { waistY: 28, splitX: 27, swingY: stomp * 0.7, swingX: stomp * 0.4 }
         );
       }
 
@@ -910,8 +801,8 @@ export class WorldRenderer {
     const hover = Math.sin(tick * 0.09) * 1.4;
     const px = vx * sx;
     const py = (vy + hover) * sy;
-    const ux = sx * 1.05;
-    const uy = sy * 1.05;
+    const ux = sx * 0.52;
+    const uy = sy * 0.52;
     const ready = level.bibbi.carried;
 
     ctx.save();
@@ -926,7 +817,7 @@ export class WorldRenderer {
     ctx.fill();
 
     if (ev.type === 'submersible') {
-      // Deep-Sea Yellow Bathysphere Submersible
+      // High-res 42x32 Deep-Sea Yellow Bathysphere Submersible
       drawCompiledSprite(
         ctx,
         SPRITE_SUBMERSIBLE,
@@ -934,21 +825,11 @@ export class WorldRenderer {
         py,
         ux,
         uy,
-        {
-          O: '#141824',
-          Y: '#ffd166',
-          y: '#f4a261',
-          g: '#6c757d',
-          L: '#adb5bd',
-          C: ready ? '#06d6a0' : '#00f5d4',
-          W: '#ffffff',
-          P: (tick & 3) < 2 ? '#e09f3e' : '#ffd166',
-        },
+        ready ? { C: '#06d6a0' } : {},
         false
       );
     } else if (ev.type === 'drillpod') {
-      // Subterranean Armored Terranaught Drill-Pod
-      const fluteSwap = (tick & 3) < 2;
+      // High-res 60x32 Subterranean Armored Terranaught Drill-Pod
       drawCompiledSprite(
         ctx,
         SPRITE_DRILLPOD,
@@ -956,21 +837,11 @@ export class WorldRenderer {
         py,
         ux,
         uy,
-        {
-          O: '#141824',
-          Y: '#e76f51',
-          S: '#6c757d',
-          C: ready ? '#06d6a0' : '#80ed99',
-          W: '#ffffff',
-          D: fluteSwap ? '#adb5bd' : '#dee2e6',
-          s: fluteSwap ? '#495057' : '#adb5bd',
-          g: '#adb5bd',
-          T: '#343a40',
-        },
+        ready ? { C: '#06d6a0' } : {},
         false
       );
     } else {
-      // VTOL Extraction Dropship / Chopper / Shuttle
+      // High-res 60x34 VTOL Extraction Dropship / Chopper / Shuttle
       drawCompiledSprite(
         ctx,
         SPRITE_VTOL,
@@ -978,32 +849,21 @@ export class WorldRenderer {
         py,
         ux,
         uy,
-        {
-          O: '#11151c',
-          S: '#3d5252',
-          N: '#526b6b',
-          g: '#6c757d',
-          C: ready ? '#06d6a0' : '#4cc9f0',
-          W: '#a8f9ff',
-        },
+        ready ? { C: '#06d6a0' } : {},
         false
       );
 
-      // Spinning VTOL Turbofan Rotor Blades & Thruster Afterburner Glow
-      const rotorW = (tick & 1) === 0 ? 11 : 6.5;
-      ctx.fillStyle = '#00f5d4';
-      ctx.fillRect(px - rotorW * ux, py - 8.2 * uy, rotorW * 2 * ux, 1.1 * uy);
-      if (ready || (tick & 3) < 2) {
-        ctx.fillStyle = ready ? '#06d6a0' : '#4cc9f0';
-        ctx.fillRect(px + 2.5 * ux, py + 3.2 * uy, 4.5 * ux, 2.2 * uy);
-      }
+      // Spinning VTOL Turbofan Rotor Glint
+      const rotorW = (tick & 1) === 0 ? 18 : 11;
+      ctx.fillStyle = ready ? '#06d6a0' : '#00f5d4';
+      ctx.fillRect(px - rotorW * ux, py - 15.5 * uy, rotorW * 1.4 * ux, 1.5 * uy);
     }
 
     // Label above vehicle
     ctx.font = 'bold 10px "JetBrains Mono", monospace';
     ctx.textAlign = 'center';
     ctx.fillStyle = ready ? '#06d6a0' : '#4cc9f0';
-    ctx.fillText(ready ? `🚁 EXTRACT HERE!` : `🚁 ${ev.name.toUpperCase()}`, px, py - 15);
+    ctx.fillText(ready ? `🚁 EXTRACT HERE!` : `🚁 ${ev.name.toUpperCase()}`, px, py - 16);
     ctx.restore();
   }
 
@@ -1026,8 +886,8 @@ export class WorldRenderer {
 
     const ex = sx * 2;
     const ey = sy * 2;
-    const ux = sx * 0.76;
-    const uy = sy * 0.76;
+    const ux = sx * 0.40;
+    const uy = sy * 0.40;
     const bounce = b.rescued ? Math.abs(Math.sin(tick * 0.18)) * 5.0 : Math.sin(tick * 0.08) * 1.2;
     const px = vx * sx;
     const py = (vy - bounce) * sy;
@@ -1041,35 +901,8 @@ export class WorldRenderer {
     ctx.arc(px, py, 9 * ex, 0, Math.PI * 2);
     ctx.fill();
 
-    // 16-bit Pixel Art Bibbi (orange twin pigtails, cyan hair ties, magenta lab coat, cyan boots)
-    drawCompiledSprite(
-      ctx,
-      SPRITE_BIBBI,
-      px,
-      py - 0.5 * uy,
-      ux,
-      uy,
-      {
-        O: '#141824',
-        A: '#ff9f1c',
-        a: '#e07a5f',
-        T: '#4cc9f0',
-        S: '#e8b49a',
-        o: '#c68b71',
-        E: '#1d3557',
-        R: '#ff99c8',
-        W: '#f8f9fa',
-        M: '#f72585',
-        m: '#b5179e',
-        C: '#00b4d8',
-      },
-      false
-    );
-
-    // White eye catchlight sparkles
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(px - 2.8 * ux, py - 4.4 * uy, 0.8 * ux, 0.8 * uy);
-    ctx.fillRect(px + 2.2 * ux, py - 4.4 * uy, 0.8 * ux, 0.8 * uy);
+    // High-res 24x38 16-bit Pixel Art Bibbi
+    drawCompiledSprite(ctx, SPRITE_BIBBI, px, py - 0.5 * uy, ux, uy, {}, false);
 
     // Delicate HP bar if Bibbi has taken damage
     if (b.hp < b.maxHp && b.hp > 0) {
@@ -1106,8 +939,8 @@ export class WorldRenderer {
     const py = vy * sy;
     const ex = sx * 2;
     const ey = sy * 2;
-    const ux = sx * 0.78;
-    const uy = sy * 0.78;
+    const ux = sx * 0.44;
+    const uy = sy * 0.44;
 
     ctx.save();
     // Quantum Phase Superposition Aura if active!
@@ -1123,25 +956,16 @@ export class WorldRenderer {
 
     // Jetpack thruster plume when flying upward
     if (!player.grounded && player.vy < -0.15) {
-      const jetX = px - f * 4.2 * ux;
-      const jetY = py + 3.2 * uy;
-      const flameH = (3.5 + ((tick & 3) * 1.1)) * uy;
+      const jetX = px - f * 7.2 * ux;
+      const jetY = py + 5.5 * uy;
+      const flameH = (6.0 + (tick & 3) * 1.8) * uy;
       ctx.fillStyle = '#ffbe0b';
-      ctx.fillRect(jetX - 1.2 * ux, jetY, 2.4 * ux, flameH);
+      ctx.fillRect(jetX - 2.0 * ux, jetY, 4.0 * ux, flameH);
       ctx.fillStyle = '#00f5d4';
-      ctx.fillRect(jetX - 0.6 * ux, jetY, 1.2 * ux, flameH * 0.65);
+      ctx.fillRect(jetX - 1.0 * ux, jetY, 2.0 * ux, flameH * 0.65);
     }
 
-    // Animated Hazmat Boots & Knee Pads
-    const legSwing = Math.abs(player.vx) > 0.15 ? Math.sin(tick * 0.35) * 1.8 : 0;
-    ctx.fillStyle = '#141824';
-    ctx.fillRect(px - 3.4 * ux, py + (5.8 + legSwing * 0.4) * uy, 3.0 * ux, 4.2 * uy);
-    ctx.fillRect(px + 0.8 * ux, py + (5.8 - legSwing * 0.4) * uy, 3.0 * ux, 4.2 * uy);
-    ctx.fillStyle = '#343a40';
-    ctx.fillRect(px - 2.8 * ux, py + (6.2 + legSwing * 0.4) * uy, 1.8 * ux, 3.2 * uy);
-    ctx.fillRect(px + 1.4 * ux, py + (6.2 - legSwing * 0.4) * uy, 1.8 * ux, 3.2 * uy);
-
-    // 16-bit Pixel Art Dr. Vance Body, Domed Helmet, Cyan Visor & Pressurized Tank
+    // High-res 28x40 Pixel Art Dr. Vance Body, Domed Helmet, Cyan Visor, Pressurized Tank & Animated Legs
     // Suit chars as suitIntegrity drops; below 55%, torn patches expose skin (which burns red or freezes cyan!)
     const suitInt = player.suitIntegrity;
     const exposedSkinColor =
@@ -1150,40 +974,33 @@ export class WorldRenderer {
         : player.bodyTemp < 31
           ? '#90e0ef'
           : '#e8b49a';
-    const suitMainColor =
-      suitInt > 70 ? '#ffd166' : suitInt > 35 ? '#c98a3b' : '#5c4033';
-    const suitSubColor =
-      suitInt > 55 ? '#f4a261' : exposedSkinColor;
-    const patchColor =
-      suitInt > 30 ? '#80ed99' : exposedSkinColor;
+    const playerOverrides: Record<string, string> = {};
+    if (suitInt <= 70) {
+      playerOverrides.Y = suitInt > 35 ? '#c98a3b' : '#5c4033';
+    }
+    if (suitInt <= 55) {
+      playerOverrides.y = exposedSkinColor;
+    }
+    if (suitInt <= 40) {
+      playerOverrides.w = exposedSkinColor;
+    }
+    if (suitInt <= 30) {
+      playerOverrides.P = exposedSkinColor;
+      playerOverrides.W = '#adb5bd';
+    }
+
+    const legSwing = Math.abs(player.vx) > 0.15 ? Math.sin(tick * 0.35) * 1.8 : 0;
 
     drawCompiledSprite(
       ctx,
       SPRITE_PLAYER_BODY,
       px,
-      py - 0.8 * uy,
+      py + 0.4 * uy,
       ux,
       uy,
-      {
-        O: '#141824',
-        W: suitInt > 25 ? '#f8f9fa' : '#adb5bd',
-        w: suitInt > 40 ? '#ced4da' : exposedSkinColor,
-        o: '#495057',
-        C: '#00f5d4',
-        V: '#a8f9ff',
-        c: '#0096c7',
-        v: '#adb5bd',
-        B: '#48cae4',
-        b: '#0077b6',
-        h: '#0096c7',
-        Y: suitMainColor,
-        y: suitSubColor,
-        P: patchColor,
-        G: '#2b2d42',
-        D: '#2b2d42',
-        U: '#ffd166',
-      },
-      flip
+      playerOverrides,
+      flip,
+      { waistY: 26, splitX: 14, swingY: legSwing * 0.65, swingX: legSwing * 0.45 }
     );
 
     // Compact Hazmat Suit Integrity micro-bar above Dr. Vance when suit is ablated (< 98%)
@@ -1199,28 +1016,16 @@ export class WorldRenderer {
     // If Bibbi is riding piggyback on Dr. Vance's back (drawn over his backpack/shoulders!)
     const b = level.bibbi;
     if (b.carried && !b.rescued) {
-      const bx = px - f * 4.8 * ux;
-      const by = py - 2.6 * uy + Math.sin(tick * 0.25) * 0.6 * uy;
+      const bx = px - f * 7.8 * ux;
+      const by = py - 4.2 * uy + Math.sin(tick * 0.25) * 1.0 * uy;
       drawCompiledSprite(
         ctx,
         SPRITE_BIBBI_PIGGYBACK,
         bx,
         by,
-        ux * 0.86,
-        uy * 0.86,
-        {
-          O: '#141824',
-          A: '#ff9f1c',
-          a: '#e07a5f',
-          T: '#4cc9f0',
-          S: '#e8b49a',
-          o: '#c68b71',
-          E: '#1d3557',
-          M: '#f72585',
-          m: '#b5179e',
-          C: '#00b4d8',
-          W: '#f8f9fa',
-        },
+        ux * 0.82,
+        uy * 0.82,
+        {},
         flip
       );
 
@@ -1237,7 +1042,7 @@ export class WorldRenderer {
       ctx.fillText(`♥ BIBBI ${Math.ceil(b.hp)}%`, px, py - 8.1 * ey);
     }
 
-    // Detailed 16-bit Omni-Tool Alchemy Blaster aiming toward mouse cursor
+    // High-res 18x9 Omni-Tool Alchemy Blaster aiming toward mouse cursor
     const angle = Math.atan2(mouseWorld.wy - player.y, mouseWorld.wx - player.x);
     ctx.translate(px, py - 0.5 * ey);
     ctx.rotate(angle);
@@ -1247,14 +1052,11 @@ export class WorldRenderer {
     drawCompiledSprite(
       ctx,
       SPRITE_OMNI_TOOL,
-      5.0 * ux,
+      8.5 * ux,
       0,
       ux * 0.82,
       uy * 0.82,
       {
-        O: '#141824',
-        S: '#adb5bd',
-        g: '#343a40',
         T: toolColor,
       },
       false
